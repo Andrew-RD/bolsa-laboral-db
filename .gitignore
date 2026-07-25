@@ -1,3 +1,4 @@
 /BolsaLaboral/target/
 *.class
+*.dat
 /.idea/workspace.xml

@@ -6,10 +6,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-
-import javax.swing.JOptionPane;
 
 import exception.NotRemovableException;
 
@@ -28,6 +27,7 @@ public class BolsaLaboral implements Serializable{
 	private ArrayList<CentroEmpleador> centros;
 	private ArrayList<VacanteCompletada> vacantes;
 	private ArrayList<Usuario> usuarios;
+	private CatalogoDatos catalogos;
 	public static BolsaLaboral instancia;
 	private Usuario usuarioActual;
 
@@ -38,6 +38,7 @@ public class BolsaLaboral implements Serializable{
 		centros = new ArrayList<CentroEmpleador>();
 		vacantes = new ArrayList<VacanteCompletada>();
 		usuarios = new ArrayList<Usuario>();
+		catalogos = new CatalogoDatos();
 	}
 
 	public ArrayList<Candidato> getCandidatos() {
@@ -87,6 +88,17 @@ public class BolsaLaboral implements Serializable{
 	public void setUsuarios(ArrayList<Usuario> usuarios) {
 		this.usuarios = usuarios;
 	}
+
+	public CatalogoDatos getCatalogos() {
+		if (catalogos == null) {
+			catalogos = new CatalogoDatos();
+		}
+		return catalogos;
+	}
+
+	public void setCatalogos(CatalogoDatos catalogos) {
+		this.catalogos = catalogos;
+	}
 	
 	public Usuario getUsuarioActual() {
 		return usuarioActual;
@@ -127,10 +139,32 @@ public class BolsaLaboral implements Serializable{
 			vacantes = new ArrayList<VacanteCompletada>();
 			System.err.println("Compatibilidad: la colección de vacantes completadas ausente fue inicializada vacía.");
 		}
+		if (ofertas == null) {
+			ofertas = new ArrayList<OfertaLaboral>();
+			System.err.println("Compatibilidad: la colección de ofertas ausente fue inicializada vacía.");
+		}
+		if (centros == null) {
+			centros = new ArrayList<CentroEmpleador>();
+			System.err.println("Compatibilidad: la colección de centros ausente fue inicializada vacía.");
+		}
+		if (usuarios == null) {
+			usuarios = new ArrayList<Usuario>();
+			System.err.println("Compatibilidad: la colección de usuarios ausente fue inicializada vacía.");
+		}
 
 		int datosMigrados = 0;
+		if (catalogos == null) {
+			catalogos = new CatalogoDatos();
+			datosMigrados++;
+		} else {
+			datosMigrados += catalogos.migrarDatosDeserializados();
+		}
 		int candidatosNulos = 0;
 		int solicitudesNulas = 0;
+		int solicitudesIncompletas = 0;
+		int vacantesNulas = 0;
+		int vacantesIncompletas = 0;
+		int ofertasIncompletas = 0;
 		Set<Solicitud> solicitudesVisitadas = Collections.newSetFromMap(
 				new IdentityHashMap<Solicitud, Boolean>());
 
@@ -139,8 +173,14 @@ public class BolsaLaboral implements Serializable{
 				solicitudesNulas++;
 				continue;
 			}
-			if (solicitudesVisitadas.add(solicitud) && normalizarEstadoSolicitud(solicitud)) {
-				datosMigrados++;
+			if (solicitudesVisitadas.add(solicitud)) {
+				if (solicitud.getSolicitante() == null
+						|| solicitud.getOfertaSolicitada() == null) {
+					solicitudesIncompletas++;
+				}
+				if (normalizarEstadoSolicitud(solicitud)) {
+					datosMigrados++;
+				}
 			}
 		}
 
@@ -149,17 +189,24 @@ public class BolsaLaboral implements Serializable{
 				candidatosNulos++;
 				continue;
 			}
-			if (candidato.getMisSolicitudes() == null) {
-				candidato.setMisSolicitudes(new ArrayList<Solicitud>());
-				datosMigrados++;
+			datosMigrados += candidato.migrarDatosDeserializados();
+			if (candidato instanceof Universitario) {
+				datosMigrados += ((Universitario) candidato)
+						.migrarUniversidadDeserializada(catalogos);
 			}
 			for (Solicitud solicitud : candidato.getMisSolicitudes()) {
 				if (solicitud == null) {
 					solicitudesNulas++;
 					continue;
 				}
-				if (solicitudesVisitadas.add(solicitud) && normalizarEstadoSolicitud(solicitud)) {
-					datosMigrados++;
+				if (solicitudesVisitadas.add(solicitud)) {
+					if (solicitud.getSolicitante() == null
+							|| solicitud.getOfertaSolicitada() == null) {
+						solicitudesIncompletas++;
+					}
+					if (normalizarEstadoSolicitud(solicitud)) {
+						datosMigrados++;
+					}
 				}
 			}
 
@@ -170,13 +217,40 @@ public class BolsaLaboral implements Serializable{
 			}
 		}
 
-		if (ofertas != null) {
-			for (OfertaLaboral oferta : ofertas) {
-				if (oferta != null && oferta.getVacantes() < 0) {
-					oferta.setVacantes(0);
-					datosMigrados++;
-				}
+		for (Usuario usuario : usuarios) {
+			if (usuario == null) {
+				System.err.println("Advertencia: se ignoró una entrada nula en la colección de usuarios.");
+				continue;
 			}
+			datosMigrados += usuario.migrarDatosDeserializados();
+		}
+
+		for (CentroEmpleador centro : centros) {
+			if (centro == null) {
+				System.err.println("Advertencia: se ignoró una entrada nula en la colección de centros.");
+				continue;
+			}
+			datosMigrados += centro.migrarDatosDeserializados();
+		}
+
+		for (VacanteCompletada vacante : vacantes) {
+			if (vacante == null) {
+				vacantesNulas++;
+			} else if (vacante.getSolicitudAceptada() == null
+					|| vacante.getOfertaOcupada() == null) {
+				vacantesIncompletas++;
+			}
+		}
+
+		for (OfertaLaboral oferta : ofertas) {
+			if (oferta == null) {
+				System.err.println("Advertencia: se ignoró una entrada nula en la colección de ofertas.");
+				continue;
+			}
+			if (oferta.getOfertador() == null) {
+				ofertasIncompletas++;
+			}
+			datosMigrados += oferta.migrarDatosDeserializados(contarVacantesOcupadas(oferta));
 		}
 
 		if (datosMigrados > 0) {
@@ -190,6 +264,22 @@ public class BolsaLaboral implements Serializable{
 		if (solicitudesNulas > 0) {
 			System.err.println("Advertencia: se ignoraron " + solicitudesNulas
 					+ " referencia(s) nula(s) a solicitudes deserializadas.");
+		}
+		if (solicitudesIncompletas > 0) {
+			System.err.println("Advertencia: se ignoraron " + solicitudesIncompletas
+					+ " solicitud(es) sin candidato u oferta asociada.");
+		}
+		if (vacantesNulas > 0) {
+			System.err.println("Advertencia: se ignoraron " + vacantesNulas
+					+ " entrada(s) nula(s) de vacantes completadas deserializadas.");
+		}
+		if (vacantesIncompletas > 0) {
+			System.err.println("Advertencia: se ignoraron " + vacantesIncompletas
+					+ " vacante(s) completada(s) sin solicitud u oferta asociada.");
+		}
+		if (ofertasIncompletas > 0) {
+			System.err.println("Advertencia: se ignoraron " + ofertasIncompletas
+					+ " oferta(s) sin centro empleador asociado.");
 		}
 		return datosMigrados;
 	}
@@ -217,6 +307,11 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public void registrarCentroTrabajo(CentroEmpleador nuevoCentro) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CENTROS);
+		if (nuevoCentro == null) {
+			throw new IllegalArgumentException("El centro empleador es obligatorio.");
+		}
+		nuevoCentro.setRnc(prepararRnc(null, nuevoCentro.getRnc()));
 		centros.add(nuevoCentro);
 		genCodigoCentro++;
 	}
@@ -226,7 +321,9 @@ public class BolsaLaboral implements Serializable{
 		boolean encontrado = false;
 		
 		while(encontrado == false && indice < centros.size()) {
-			if(centros.get(indice).getCodigo().equalsIgnoreCase(codigo)) {
+			CentroEmpleador centro = centros.get(indice);
+			if(centro != null && centro.getCodigo() != null && codigo != null
+					&& centro.getCodigo().equalsIgnoreCase(codigo)) {
 				encontrado = true;
 			}
 			else {
@@ -238,8 +335,14 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public boolean modificarCentroTrabajo(CentroEmpleador centroModificar) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CENTROS);
+		if (centroModificar == null) {
+			throw new IllegalArgumentException("El centro empleador es obligatorio.");
+		}
 		int indice = buscarIndiceCentroByCodigo(centroModificar.getCodigo());
 		if(indice != -1) {
+			CentroEmpleador existente = centros.get(indice);
+			centroModificar.setRnc(prepararRnc(existente, centroModificar.getRnc()));
 			centros.set(indice,centroModificar);
 			return true;
 		}
@@ -247,6 +350,7 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public void eliminarCentroTrabajo(CentroEmpleador centroEliminar) throws NotRemovableException{
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CENTROS);
 		if(centroEliminable(centroEliminar)) {
 			centros.remove(centroEliminar);
 		}
@@ -256,11 +360,39 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public void registrarCandidato(Candidato nuevoCandidato) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CANDIDATOS);
+		if (nuevoCandidato == null) {
+			throw new IllegalArgumentException("El candidato es obligatorio.");
+		}
+		nuevoCandidato.setIdentificacion(prepararCedula(null, nuevoCandidato.getIdentificacion()));
+		nuevoCandidato.setEstado(Candidato.ESTADO_DESEMPLEADO);
 		candidatos.add(nuevoCandidato);
 		genCodigoCandidato++;
 	}
+
+	public boolean modificarCandidato(Candidato candidatoModificar) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CANDIDATOS);
+		if (candidatoModificar == null) {
+			throw new IllegalArgumentException("El candidato es obligatorio.");
+		}
+		int indice = candidatos.indexOf(candidatoModificar);
+		if (indice < 0 && candidatoModificar.getCodigo() != null) {
+			Candidato actual = buscarCandidatoByCodigo(candidatoModificar.getCodigo());
+			indice = candidatos.indexOf(actual);
+		}
+		if (indice < 0) {
+			return false;
+		}
+		Candidato existente = candidatos.get(indice);
+		candidatoModificar.setIdentificacion(
+				prepararCedula(existente, candidatoModificar.getIdentificacion()));
+		candidatoModificar.actualizarEstadoLaboral();
+		candidatos.set(indice, candidatoModificar);
+		return true;
+	}
 	
 	public void eliminarCandidato(Candidato candidatoEliminar) throws NotRemovableException{
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CANDIDATOS);
 		if(candidatoEliminable(candidatoEliminar)) {
 			candidatos.remove(candidatoEliminar);
 		}
@@ -273,8 +405,9 @@ public class BolsaLaboral implements Serializable{
 		Candidato encontrado = null;
 		int indice = 0;
 		while(encontrado == null && indice < candidatos.size()) {
-			if(candidatos.get(indice).getCodigo().equals(codigo)) {
-				encontrado = candidatos.get(indice);
+			Candidato candidato = candidatos.get(indice);
+			if(candidato != null && Objects.equals(candidato.getCodigo(), codigo)) {
+				encontrado = candidato;
 			}
 			indice++;
 		}
@@ -285,8 +418,9 @@ public class BolsaLaboral implements Serializable{
 		CentroEmpleador encontrado = null;
 		int indice = 0;
 		while(encontrado == null && indice < centros.size()) {
-			if(centros.get(indice).getCodigo().equals(codigo)) {
-				encontrado = centros.get(indice);
+			CentroEmpleador centro = centros.get(indice);
+			if(centro != null && Objects.equals(centro.getCodigo(), codigo)) {
+				encontrado = centro;
 			}
 			indice++;
 		}
@@ -294,27 +428,23 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public ArrayList<ResultadoMatcheo> obtenerCandidatosOrdenadosParaOferta(OfertaLaboral oferta) {
-	    ArrayList<ResultadoMatcheo> ordenados = new ArrayList<>();
-
-	    for (Candidato candidato : candidatos) {
-	    	if(candidato != null && "Desempleado".equals(candidato.getEstado())) {
-		        int puntaje = calcularPuntaje(candidato, oferta);
-		        
-		        if (puntaje >= oferta.getPorcentajeMinimo()) {
-		            String condicion = obtenerCondicion(puntaje, oferta.getPorcentajeMinimo());
-
-		            ResultadoMatcheo resultadoMatcheo = new ResultadoMatcheo(oferta, candidato, puntaje, condicion);
-
-		            ordenados.add(resultadoMatcheo);
-		        }
-	    	}
-	    }
-	    
-	    Comparator<ResultadoMatcheo> c = (a, b) -> b.getPorcentaje() - a.getPorcentaje();
-	    
-	    ordenados.sort(c);
-
-	    return ordenados;
+		ArrayList<ResultadoMatcheo> ordenados = new ArrayList<ResultadoMatcheo>();
+		for (Candidato candidato : candidatos) {
+			if (candidato != null
+					&& Candidato.ESTADO_DESEMPLEADO.equals(candidato.getEstado())) {
+				int puntaje = calcularPuntaje(candidato, oferta);
+				if (puntaje >= oferta.getPorcentajeMinimo()) {
+					String condicion = obtenerCondicion(
+							puntaje, oferta.getPorcentajeMinimo());
+					ordenados.add(new ResultadoMatcheo(
+							oferta, candidato, puntaje, condicion));
+				}
+			}
+		}
+		Comparator<ResultadoMatcheo> comparador =
+				(a, b) -> b.getPorcentaje() - a.getPorcentaje();
+		ordenados.sort(comparador);
+		return ordenados;
 	}
 
 	
@@ -360,22 +490,28 @@ public class BolsaLaboral implements Serializable{
 	    
 	    puntaje += Math.min(10, (idiomasPuntos*10)/Math.max(1, idiomasRequeridos));
 	    
-	    if (candidato instanceof Universitario && oferta.getNivelAcademico().equalsIgnoreCase("Estudiante Universitario")) {
-	    	Universitario u = (Universitario) candidato;
-	    	puntaje += 5;
-	    	if(u.getCarrera().equals(oferta.getRequisitos().get(0))) {
-	    		puntaje += 15;
-	    	}
-	    } else if (candidato instanceof TecnicoSuperior && oferta.getNivelAcademico().equalsIgnoreCase("Estudiante Tecnico")) {
+	    TipoCandidato tipoRequerido = oferta.getTipoCandidatoRequerido();
+	    if (candidato.getTipoCandidato() == TipoCandidato.UNIVERSITARIO
+			&& tipoRequerido == TipoCandidato.UNIVERSITARIO) {
+		Universitario u = (Universitario) candidato;
+		puntaje += 5;
+		if(!oferta.getRequisitos().isEmpty()
+				&& Objects.equals(u.getCarrera(), oferta.getRequisitos().get(0))) {
+			puntaje += 15;
+		}
+	    } else if (candidato.getTipoCandidato() == TipoCandidato.TECNICO
+			&& tipoRequerido == TipoCandidato.TECNICO) {
 	        TecnicoSuperior t = (TecnicoSuperior) candidato;
 	        puntaje += 5;
-	        if(t.getAreaTecnica().equals(oferta.getRequisitos().get(0))) {
-	        	puntaje += 10;
+	        if(!oferta.getRequisitos().isEmpty()
+			&& Objects.equals(t.getAreaTecnica(), oferta.getRequisitos().get(0))) {
+		puntaje += 10;
 	        }
 	        if (t.getAniosExperiencia() >= oferta.getExperienciaMinima()) {
 	            puntaje += 5;
 	        }
-	    } else if (candidato instanceof Obrero && oferta.getNivelAcademico().equalsIgnoreCase("Obrero")) {
+	    } else if (candidato.getTipoCandidato() == TipoCandidato.OBRERO
+			&& tipoRequerido == TipoCandidato.OBRERO) {
 	        Obrero o = (Obrero) candidato;
 	        puntaje += 10;
 	        int habilidadPuntos = 0;
@@ -399,19 +535,20 @@ public class BolsaLaboral implements Serializable{
 	    }
 	    
 	    if(oferta.isObligatorioMayorDeEdad()) {
-	    	if(candidato.getEdad() >= 18) {
-	    		puntaje += 5;
-	    	} else {
-	    		puntaje -= 25;
-	    	}
+			if(candidato.getEdad() >= 18) {
+				puntaje += 5;
+			} else {
+				puntaje -= 25;
+			}
 	    } else {
-	    	puntaje += 5;
+			puntaje += 5;
 	    }
 	    
 	    return Math.max(0, puntaje);
 	}
 
 	public void eliminarOfertaTrabajo(OfertaLaboral seleccionado) throws NotRemovableException{
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_OFERTAS);
 		if(ofertaEliminable(seleccionado)) {
 			seleccionado.getOfertador().getOfertasLaborales().remove(seleccionado);
 			ofertas.remove(seleccionado);
@@ -425,8 +562,9 @@ public class BolsaLaboral implements Serializable{
 		OfertaLaboral encontrado = null;
 		int indice = 0;
 		while(encontrado == null && indice < ofertas.size()) {
-			if(ofertas.get(indice).getCodigo().equals(codigo)) {
-				encontrado = ofertas.get(indice);
+			OfertaLaboral oferta = ofertas.get(indice);
+			if(oferta != null && Objects.equals(oferta.getCodigo(), codigo)) {
+				encontrado = oferta;
 			}
 			indice++;
 		}
@@ -438,7 +576,9 @@ public class BolsaLaboral implements Serializable{
 		boolean encontrado = false;
 		
 		while(encontrado == false && indice < ofertas.size()) {
-			if(ofertas.get(indice).getCodigo().equalsIgnoreCase(codigo)) {
+			OfertaLaboral oferta = ofertas.get(indice);
+			if(oferta != null && oferta.getCodigo() != null && codigo != null
+					&& oferta.getCodigo().equalsIgnoreCase(codigo)) {
 				encontrado = true;
 			}
 			else {
@@ -450,14 +590,24 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public void registrarOfertaLaboral(OfertaLaboral nuevaOferta) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_OFERTAS);
+		if (nuevaOferta == null || nuevaOferta.getOfertador() == null) {
+			throw new IllegalArgumentException("La oferta y su centro empleador son obligatorios.");
+		}
+		nuevaOferta.sincronizarVacantesOcupadas(0);
 		ofertas.add(nuevaOferta);
 		nuevaOferta.getOfertador().getOfertasLaborales().add(nuevaOferta);
 		genCodigoOferta++;
 	}
 	
 	public boolean modificarOfertaLaboral(OfertaLaboral ofertaModificar) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_OFERTAS);
+		if (ofertaModificar == null) {
+			throw new IllegalArgumentException("La oferta es obligatoria.");
+		}
 		int indice = buscarIndiceOfertaByCodigo(ofertaModificar.getCodigo());
 		if(indice != -1) {
+			ofertaModificar.sincronizarVacantesOcupadas(contarVacantesOcupadas(ofertaModificar));
 			ofertas.set(indice,ofertaModificar);
 			return true;
 		}
@@ -481,19 +631,26 @@ public class BolsaLaboral implements Serializable{
 	public void regVacanteCompletada(Solicitud solicitudContratada) {
 		contratarCandidato(solicitudContratada);
 	}
-	
+
+	/** Alta interna usada únicamente durante la creación inicial del archivo. */
 	public void regUsuario(Usuario user) {
+		if (user == null) {
+			throw new IllegalArgumentException("El usuario es obligatorio.");
+		}
+		user.migrarDatosDeserializados();
 		usuarios.add(user);
 	}
 
 	public Usuario login(String nombre, String clave) {
-		Usuario aux = null;
+		if (nombre == null || clave == null) {
+			return null;
+		}
 		for(Usuario user : usuarios) {
-			if(user.match(nombre, clave)) {
-				aux = user;
+			if(user != null && user.match(nombre, clave)) {
+				return user;
 			}
 		}
-		return aux;
+		return null;
 	}
 	
 	public boolean centroEliminable(CentroEmpleador centro) {
@@ -523,7 +680,11 @@ public class BolsaLaboral implements Serializable{
 	public ArrayList<OfertaLaboral> ofertasDisponibles(){
 		ArrayList<OfertaLaboral> ofertasDisponibles = new ArrayList<>();
 		for(OfertaLaboral ofr: ofertas) {
-			if(ofr.getVacantes() > 0) {
+			if(ofr != null) {
+				ofr.sincronizarVacantesOcupadas(contarVacantesOcupadas(ofr));
+			}
+			if(ofr != null && OfertaLaboral.ESTADO_ACTIVA.equals(ofr.getEstado())
+					&& ofr.getVacantesDisponibles() > 0) {
 				ofertasDisponibles.add(ofr);
 			}
 		}
@@ -531,9 +692,10 @@ public class BolsaLaboral implements Serializable{
 	}
 	
 	public ArrayList<ResultadoMatcheo> procesamientoAvanzando(){
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.USAR_PROCESAMIENTO_AVANZADO);
 		ArrayList<ResultadoMatcheo> resultados = new ArrayList<>();
 		for(OfertaLaboral ofr : ofertas) {
-			if(ofr.getVacantes() > 0) {
+			if(evaluarProcesamiento(ofr).isPermitido()) {
 				resultados.addAll(obtenerCandidatosOrdenadosParaOferta(ofr));
 			}
 		}
@@ -569,35 +731,38 @@ public class BolsaLaboral implements Serializable{
 	}
 
 	public boolean vincularOferta(ResultadoMatcheo resMatchSelec) {
-		boolean aux = false;
-		if(resMatchSelec != null && resMatchSelec.getOferta() != null
-				&& resMatchSelec.getSolicitante() != null && resMatchSelec.getOferta().getVacantes() > 0) {
-			Solicitud sol = new Solicitud("SOL-" + genCodigoSolicitud, LocalDate.now(),
-					Solicitud.ESTADO_ENVIADA, resMatchSelec.getSolicitante(), resMatchSelec.getOferta());
-			if(verificarSolicitud(sol)) {
-				solicitudes.add(sol);
-				resMatchSelec.getSolicitante().addSolicitud(sol);
-				resMatchSelec.getSolicitante().actualizarEstadoLaboral();
-				genCodigoSolicitud++;
-				aux = true;
-			}
+		AutorizacionService.exigirPermiso(
+				usuarioActual, Permiso.USAR_PROCESAMIENTO_AVANZADO);
+		DecisionProcesamiento decision = evaluarVinculacion(resMatchSelec);
+		if (!decision.isPermitido()) {
+			return false;
 		}
-		return aux;
+		Solicitud sol = new Solicitud("SOL-" + genCodigoSolicitud, LocalDate.now(),
+				Solicitud.ESTADO_ENVIADA, resMatchSelec.getSolicitante(), resMatchSelec.getOferta());
+		if (!verificarSolicitud(sol)) {
+			return false;
+		}
+		solicitudes.add(sol);
+		resMatchSelec.getSolicitante().addSolicitud(sol);
+		resMatchSelec.getSolicitante().actualizarEstadoLaboral();
+		genCodigoSolicitud++;
+		return true;
 	}
 	
 	public boolean verificarSolicitud(Solicitud solicitud) {
 		if (solicitud == null) {
 			return false;
 		}
-		boolean aux = true;
-
 		for(Solicitud sol : solicitudes) {
-			if(matchSolicitud(sol, solicitud)) {
-				aux = false;
+			if (sol == null) {
+				continue;
+			}
+			if (Objects.equals(sol.getSolicitante(), solicitud.getSolicitante())
+					&& Objects.equals(sol.getOfertaSolicitada(), solicitud.getOfertaSolicitada())) {
+				return false;
 			}
 		}
-		
-		return aux;
+		return true;
 	}
 	
 	public boolean matchSolicitud(Solicitud s1, Solicitud s2) {
@@ -611,6 +776,7 @@ public class BolsaLaboral implements Serializable{
 	}
 
 	public boolean contratarCandidato(Solicitud solicitud) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.PROCESAR_SOLICITUDES);
 		if (!puedeContratarCandidato(solicitud)) {
 			return false;
 		}
@@ -618,15 +784,10 @@ public class BolsaLaboral implements Serializable{
 		OfertaLaboral oferta = solicitud.getOfertaSolicitada();
 		Candidato candidato = solicitud.getSolicitante();
 		solicitud.setEstado(Solicitud.ESTADO_APROBADA);
-		oferta.setVacantes(oferta.getVacantes() - 1);
 		if (candidato.getMisSolicitudes() == null || !candidato.getMisSolicitudes().contains(solicitud)) {
 			candidato.addSolicitud(solicitud);
 		}
 		candidato.cambiarEstadoSolicitudesAEmpleado();
-
-		if(oferta.getVacantes() == 0) {
-			oferta.setEstado(OfertaLaboral.ESTADO_COMPLETADA);
-		}
 
 		VacanteCompletada vacante = new VacanteCompletada("VAC-" + genCodigoVacanteCompletada,
 				solicitud, oferta, LocalDate.now());
@@ -635,10 +796,12 @@ public class BolsaLaboral implements Serializable{
 		}
 		vacantes.add(vacante);
 		genCodigoVacanteCompletada++;
+		oferta.sincronizarVacantesOcupadas(contarVacantesOcupadas(oferta));
 		return true;
 	}
 
 	public void rechazarCandidato(Solicitud solicitud) {
+		AutorizacionService.exigirPermiso(usuarioActual, Permiso.PROCESAR_SOLICITUDES);
 		if (!esProcesable(solicitud)) {
 			return;
 		}
@@ -673,8 +836,17 @@ public class BolsaLaboral implements Serializable{
 	}
 
 	public boolean puedeContratarCandidato(Solicitud solicitud) {
+		if (!AutorizacionService.tienePermiso(usuarioActual, Permiso.PROCESAR_SOLICITUDES)) {
+			return false;
+		}
 		if (!esProcesable(solicitud) || solicitud.getOfertaSolicitada() == null
-				|| solicitud.getSolicitante() == null || solicitud.getOfertaSolicitada().getVacantes() <= 0) {
+				|| solicitud.getSolicitante() == null) {
+			return false;
+		}
+		OfertaLaboral oferta = solicitud.getOfertaSolicitada();
+		oferta.sincronizarVacantesOcupadas(contarVacantesOcupadas(oferta));
+		if (!OfertaLaboral.ESTADO_ACTIVA.equals(oferta.getEstado())
+				|| oferta.getVacantesDisponibles() <= 0) {
 			return false;
 		}
 		if (vacantes == null) {
@@ -691,6 +863,184 @@ public class BolsaLaboral implements Serializable{
 			}
 		}
 		return true;
+	}
+
+	public DecisionProcesamiento evaluarProcesamiento(OfertaLaboral oferta) {
+		if (oferta == null) {
+			return DecisionProcesamiento.rechazar("Debe seleccionar una oferta.");
+		}
+		if (usuarioActual == null) {
+			return DecisionProcesamiento.rechazar(
+					"No hay un usuario autenticado para procesar la oferta.");
+		}
+		if (!usuarioActual.isActivo()) {
+			return DecisionProcesamiento.rechazar(
+					"El usuario actual está inactivo.");
+		}
+		if (!AutorizacionService.tienePermiso(
+				usuarioActual, Permiso.USAR_PROCESAMIENTO_AVANZADO)) {
+			return DecisionProcesamiento.rechazar(
+					"No tiene permiso para utilizar el procesamiento avanzado.");
+		}
+		oferta.sincronizarVacantesOcupadas(contarVacantesOcupadas(oferta));
+		if (oferta.getVacantesDisponibles() <= 0) {
+			return DecisionProcesamiento.rechazar(
+					"La oferta no tiene vacantes disponibles.");
+		}
+		if (!OfertaLaboral.ESTADO_ACTIVA.equals(oferta.getEstado())) {
+			return DecisionProcesamiento.rechazar(
+					"La oferta no está activa; su estado actual es "
+							+ oferta.getEstado() + ".");
+		}
+		ArrayList<ResultadoMatcheo> candidatosElegibles =
+				obtenerCandidatosOrdenadosParaOferta(oferta);
+		if (candidatosElegibles.isEmpty()) {
+			return DecisionProcesamiento.rechazar(
+					"No existe ningún candidato elegible que alcance "
+							+ "el porcentaje mínimo de la oferta.");
+		}
+		for (ResultadoMatcheo resultado : candidatosElegibles) {
+			if (resultado != null && resultado.getSolicitante() != null
+					&& !existeSolicitud(resultado.getSolicitante(), oferta)) {
+				return DecisionProcesamiento.permitir();
+			}
+		}
+		return DecisionProcesamiento.rechazar(
+				"Todos los candidatos elegibles ya tienen una solicitud "
+						+ "para esta oferta.");
+	}
+
+	public DecisionProcesamiento evaluarVinculacion(ResultadoMatcheo resultado) {
+		if (resultado == null || resultado.getOferta() == null
+				|| resultado.getSolicitante() == null) {
+			return DecisionProcesamiento.rechazar(
+					"Debe seleccionar un candidato elegible.");
+		}
+		DecisionProcesamiento ofertaDecision = evaluarProcesamiento(resultado.getOferta());
+		if (!ofertaDecision.isPermitido()) {
+			return ofertaDecision;
+		}
+		Candidato candidato = resultado.getSolicitante();
+		if (!candidatos.contains(candidato)
+				|| !Candidato.ESTADO_DESEMPLEADO.equals(candidato.getEstado())) {
+			return DecisionProcesamiento.rechazar(
+					"El candidato ya no está elegible para una nueva solicitud.");
+		}
+		if (resultado.getPorcentaje() < resultado.getOferta().getPorcentajeMinimo()) {
+			return DecisionProcesamiento.rechazar(
+					"El candidato no alcanza el porcentaje mínimo de la oferta.");
+		}
+		if (existeSolicitud(candidato, resultado.getOferta())) {
+			return DecisionProcesamiento.rechazar(
+					"Ya existe una solicitud para este candidato y esta oferta.");
+		}
+		return DecisionProcesamiento.permitir();
+	}
+
+	public String prepararCedula(Candidato existente, String valor) {
+		ResultadoDocumento resultado = CedulaValidator.validar(valor);
+		if (!resultado.esValido()) {
+			if (existente != null && Objects.equals(existente.getIdentificacion(), valor)) {
+				return valor;
+			}
+			throw new IllegalArgumentException(resultado.getMensaje());
+		}
+		if (existeCedulaNormalizada(resultado.getNormalizado(), existente)) {
+			throw new IllegalArgumentException(
+					"Ya existe un candidato con esa cédula.");
+		}
+		return resultado.getNormalizado();
+	}
+
+	public String prepararRnc(CentroEmpleador existente, String valor) {
+		ResultadoDocumento resultado = RncValidator.validar(valor);
+		if (!resultado.esValido()) {
+			if (existente != null && Objects.equals(existente.getRnc(), valor)) {
+				return valor;
+			}
+			throw new IllegalArgumentException(resultado.getMensaje());
+		}
+		if (existeRncNormalizado(resultado.getNormalizado(), existente)) {
+			throw new IllegalArgumentException("Ya existe un centro empleador con ese RNC.");
+		}
+		return resultado.getNormalizado();
+	}
+
+	public boolean existeCedulaNormalizada(String normalizada, Candidato excluir) {
+		for (Candidato candidato : candidatos) {
+			if (candidato == null || candidato == excluir) {
+				continue;
+			}
+			try {
+				if (CedulaValidator.normalizar(candidato.getIdentificacion()).equals(normalizada)) {
+					return true;
+				}
+			} catch (IllegalArgumentException exception) {
+				// Un valor legado no normalizable no puede coincidir con uno válido.
+			}
+		}
+		return false;
+	}
+
+	public boolean existeRncNormalizado(String normalizado, CentroEmpleador excluir) {
+		for (CentroEmpleador centro : centros) {
+			if (centro == null || centro == excluir) {
+				continue;
+			}
+			try {
+				if (RncValidator.normalizar(centro.getRnc()).equals(normalizado)) {
+					return true;
+				}
+			} catch (IllegalArgumentException exception) {
+				// Un valor legado no normalizable no puede coincidir con uno válido.
+			}
+		}
+		return false;
+	}
+
+	public int contarVacantesOcupadas(OfertaLaboral oferta) {
+		if (oferta == null || vacantes == null) {
+			return 0;
+		}
+		Set<String> solicitudesContadas = new HashSet<String>();
+		int ocupadas = 0;
+		for (VacanteCompletada vacante : vacantes) {
+			if (vacante == null) {
+				continue;
+			}
+			Solicitud solicitud = vacante.getSolicitudAceptada();
+			OfertaLaboral asociada = vacante.getOfertaOcupada();
+			if (solicitud == null || asociada == null
+					|| !mismaOferta(asociada, oferta)
+					|| !Solicitud.ESTADO_APROBADA.equals(solicitud.getEstado())) {
+				continue;
+			}
+			String clave = solicitud.getCodigo() == null
+					? "identidad:" + System.identityHashCode(solicitud)
+					: "codigo:" + solicitud.getCodigo();
+			if (solicitudesContadas.add(clave)) {
+				ocupadas++;
+			}
+		}
+		return ocupadas;
+	}
+
+	private boolean existeSolicitud(Candidato candidato, OfertaLaboral oferta) {
+		for (Solicitud solicitud : solicitudes) {
+			if (solicitud != null && Objects.equals(candidato, solicitud.getSolicitante())
+					&& mismaOferta(oferta, solicitud.getOfertaSolicitada())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean mismaOferta(OfertaLaboral izquierda, OfertaLaboral derecha) {
+		if (izquierda == derecha) {
+			return true;
+		}
+		return izquierda != null && derecha != null && izquierda.getCodigo() != null
+				&& izquierda.getCodigo().equals(derecha.getCodigo());
 	}
 	
 	public ArrayList<Solicitud> obtenerSolicitudesVinculadas(OfertaLaboral oferta){
@@ -710,35 +1060,43 @@ public class BolsaLaboral implements Serializable{
 	
 	public int calcularTasaCovertura() {
 		long puestosOcupados = 0;
-		if (vacantes != null) {
-			for (VacanteCompletada vacante : vacantes) {
-				if (vacante != null) {
-					puestosOcupados++;
-				}
-			}
-		}
-
-		long puestosDisponibles = 0;
+		long puestosTotales = 0;
 		if (ofertas != null) {
 			for (OfertaLaboral oferta : ofertas) {
 				if (oferta != null) {
-					puestosDisponibles += Math.max(0, oferta.getVacantes());
+					int ocupadas = contarVacantesOcupadas(oferta);
+					oferta.sincronizarVacantesOcupadas(ocupadas);
+					puestosOcupados += ocupadas;
+					puestosTotales += Math.max(0, oferta.getVacantesTotales());
 				}
 			}
 		}
-
-		long puestosTotales = puestosOcupados + puestosDisponibles;
 		if (puestosTotales == 0) {
 			return 0;
 		}
 		int cobertura = Math.round(puestosOcupados * 100.0f / puestosTotales);
 		return Math.max(0, Math.min(100, cobertura));
 	}
-	
-	
+
+	public int contarVacantesOcupadasTotales() {
+		long ocupadas = 0;
+		if (ofertas != null) {
+			for (OfertaLaboral oferta : ofertas) {
+				if (oferta != null) {
+					ocupadas += contarVacantesOcupadas(oferta);
+				}
+			}
+		}
+		return ocupadas > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) ocupadas;
+	}
+
+
 	public int obtenerOfertasVacias() {
 		int cantidad = 0;
 		for(OfertaLaboral ofr: ofertas) {
+			if (ofr == null) {
+				continue;
+			}
 			boolean encontrado = false;
 			
 			int indice = 0;

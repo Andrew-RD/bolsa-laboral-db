@@ -22,12 +22,16 @@ public class SolicitudWorkflowTest {
     public void setUp() {
         bolsa = BolsaLaboral.getInstancia();
         clearData();
+        Usuario admin = new Usuario("Administrador de prueba", "admin-prueba",
+                "admin@example.test", RolUsuario.ADMINISTRADOR, true, "ClaveTemporal1".toCharArray());
+        bolsa.regUsuario(admin);
+        bolsa.setUsuarioActual(admin);
 
         ArrayList<String> idiomas = new ArrayList<String>();
         idiomas.add("Español");
         ArrayList<String> habilidades = new ArrayList<String>();
         habilidades.add("Limpieza");
-        candidato = new Obrero("CAN-TEST", "00100000001", "Ana", "Pérez",
+        candidato = new Obrero("CAN-TEST", "00100000009", "Ana", "Pérez",
                 LocalDate.of(1990, 1, 1), "Femenino", "Distrito Nacional", "Santo Domingo",
                 "8095550101", "ana@example.com", "Tiempo Completo", "Presencial", "Limpieza",
                 20000.0f, false, false, idiomas, habilidades, "Desempleado");
@@ -71,6 +75,23 @@ public class SolicitudWorkflowTest {
         assertEquals("Enviada", pendiente.getEstado());
         assertEquals("En Espera", candidato.getEstado());
         assertEquals(2, oferta.getVacantes());
+    }
+
+    @Test
+    public void rechazarPendienteNoDesempleaAQuienTieneOtraAprobada() {
+        Solicitud aprobada = solicitud("SOL-APROBADA",
+                oferta("OFR-APROBADA", 1), Solicitud.ESTADO_APROBADA);
+        Solicitud pendiente = solicitud("SOL-PENDIENTE",
+                oferta("OFR-PENDIENTE", 1), Solicitud.ESTADO_ENVIADA);
+        candidato.actualizarEstadoLaboral();
+
+        bolsa.rechazarCandidato(pendiente);
+
+        assertEquals(Solicitud.ESTADO_APROBADA, aprobada.getEstado());
+        assertEquals(Solicitud.ESTADO_RECHAZADA, pendiente.getEstado());
+        assertEquals(Candidato.ESTADO_EMPLEADO, candidato.getEstado());
+        assertTrue(candidato.getDescripcionEstadoLaboral()
+                .contains("solicitud aprobada"));
     }
 
     @Test
@@ -219,5 +240,6 @@ public class SolicitudWorkflowTest {
         bolsa.getCentros().clear();
         bolsa.getVacantes().clear();
         bolsa.getUsuarios().clear();
+        bolsa.setUsuarioActual(null);
     }
 }

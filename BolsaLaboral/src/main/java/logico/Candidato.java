@@ -31,6 +31,7 @@ public abstract class Candidato implements Serializable{
 	private String estado;
 	private ArrayList<String> idiomas;
 	private ArrayList<Solicitud> misSolicitudes;
+	private TipoCandidato tipoCandidato;
 
 	public Candidato(String codigo, String identificacion, String nombres, String apellidos, LocalDate fechaNacimiento,
 			String genero, String provincia, String municipio, String telefono, String correo, String jornada,
@@ -56,6 +57,32 @@ public abstract class Candidato implements Serializable{
 		this.idiomas = idiomas;
 		this.misSolicitudes =  new ArrayList<Solicitud> ();
 		this.estado = estado;
+	}
+
+	public int migrarDatosDeserializados() {
+		int cambios = 0;
+		if (idiomas == null) {
+			idiomas = new ArrayList<String>();
+			cambios++;
+		}
+		if (misSolicitudes == null) {
+			misSolicitudes = new ArrayList<Solicitud>();
+			cambios++;
+		}
+		if (tipoCandidato == null) {
+			if (this instanceof Universitario) {
+				tipoCandidato = TipoCandidato.UNIVERSITARIO;
+			} else if (this instanceof TecnicoSuperior) {
+				tipoCandidato = TipoCandidato.TECNICO;
+			} else {
+				tipoCandidato = TipoCandidato.OBRERO;
+			}
+			cambios++;
+		}
+		if (this instanceof Universitario) {
+			cambios += ((Universitario) this).migrarSituacionDeserializada();
+		}
+		return cambios;
 	}
 
 	public String getCodigo() {
@@ -265,8 +292,40 @@ public abstract class Candidato implements Serializable{
 		return estado;
 	}
 
+	public String getDescripcionEstadoLaboral() {
+		return descripcionEstadoLaboral(estado);
+	}
+
+	public static String descripcionEstadoLaboral(String estado) {
+		if (ESTADO_EMPLEADO.equals(estado)) {
+			return "Empleado — se deriva de una solicitud aprobada";
+		}
+		if (ESTADO_EN_ESPERA.equals(estado)) {
+			return "En Espera — se deriva de solicitudes enviadas";
+		}
+		if (estado != null && !estado.trim().isEmpty()
+				&& !ESTADO_DESEMPLEADO.equals(estado)) {
+			return estado.trim()
+					+ " — valor legado; se actualiza mediante las solicitudes";
+		}
+		return "Desempleado — se actualiza automáticamente al aprobar una solicitud";
+	}
+
 	public void setEstado(String estado) {
 		this.estado = estado;
+	}
+
+	public TipoCandidato getTipoCandidato() {
+		if (tipoCandidato == null) {
+			if (this instanceof Universitario) {
+				tipoCandidato = TipoCandidato.UNIVERSITARIO;
+			} else if (this instanceof TecnicoSuperior) {
+				tipoCandidato = TipoCandidato.TECNICO;
+			} else {
+				tipoCandidato = TipoCandidato.OBRERO;
+			}
+		}
+		return tipoCandidato;
 	}
 	
 	public void addSolicitud(Solicitud solicitud) {

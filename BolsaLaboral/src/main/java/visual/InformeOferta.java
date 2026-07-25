@@ -3,6 +3,8 @@ package visual;
 import logico.BolsaLaboral;
 import logico.OfertaLaboral;
 import logico.Solicitud;
+import logico.AutorizacionService;
+import logico.Permiso;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -47,6 +49,8 @@ public class InformeOferta extends JDialog {
     private ArrayList<Solicitud> solicitudesVinculadas = new ArrayList<Solicitud>();
 
     public InformeOferta(OfertaLaboral oferta) {
+        AutorizacionService.exigirPermiso(
+                BolsaLaboral.getInstancia().getUsuarioActual(), Permiso.VER_INFORMES);
         setTitle("(" + oferta.getCodigo() + ") " + oferta.getPuesto());
         setIconImage(UIUtils.image("icono.png"));
 
@@ -136,7 +140,9 @@ public class InformeOferta extends JDialog {
         lblPuesto.setText(oferta.getPuesto());
         lblArea.setToolTipText(oferta.getArea());
         lblEstado.setText("Estado: " + oferta.getEstado());
-        lblCantidadVac.setText("Vacantes Disponibles: " + oferta.getVacantes());
+        lblCantidadVac.setText("Vacantes: " + oferta.getVacantesTotales()
+                + " totales | " + oferta.getVacantesOcupadas()
+                + " ocupadas | " + oferta.getVacantesDisponibles() + " disponibles");
         lblDeAceptacin.setText("% Mínimo: " + oferta.getPorcentajeMinimo() + "%");
         lblArea.setIcon(UIUtils.valueIcon(oferta.getArea()));
         lblJornada.setToolTipText(oferta.getJornada());

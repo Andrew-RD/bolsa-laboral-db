@@ -50,6 +50,8 @@ public class ConsultarSolicitudes extends JDialog {
 	 * Create the dialog.
 	 */
 	public ConsultarSolicitudes() {
+		AutorizacionService.exigirPermiso(BolsaLaboral.getInstancia().getUsuarioActual(),
+				Permiso.CONSULTAR_SOLICITUDES);
 		setTitle("Listado de Solicitudes a Procesar");
 		setIconImage(UIUtils.image("icono.png"));
 		getContentPane().setLayout(new BorderLayout());
@@ -133,15 +135,20 @@ public class ConsultarSolicitudes extends JDialog {
 					btnContratar.setBackground(Color.WHITE);
 					btnContratar.addActionListener(new ActionListener() {
 						public void actionPerformed(ActionEvent e) {
-							if(BolsaLaboral.getInstancia().contratarCandidato(seleccionado)) {
-								JOptionPane.showMessageDialog(ConsultarSolicitudes.this,"Contratación procesada satisfactoriamente.","Información",JOptionPane.INFORMATION_MESSAGE);
-								cargarSolicitudes();
-								filtrar();
-							}
-							else {
+							try {
+								if(BolsaLaboral.getInstancia().contratarCandidato(seleccionado)) {
+									JOptionPane.showMessageDialog(ConsultarSolicitudes.this,"Contratación procesada satisfactoriamente.","Información",JOptionPane.INFORMATION_MESSAGE);
+									cargarSolicitudes();
+									filtrar();
+								} else {
+									JOptionPane.showMessageDialog(ConsultarSolicitudes.this,
+											"Solo se puede aprobar una solicitud Enviada cuya oferta tenga vacantes disponibles.",
+											"Advertencia", JOptionPane.WARNING_MESSAGE);
+								}
+							} catch (SecurityException exception) {
 								JOptionPane.showMessageDialog(ConsultarSolicitudes.this,
-										"Solo se puede aprobar una solicitud Enviada cuya oferta tenga vacantes disponibles.",
-										"Advertencia", JOptionPane.WARNING_MESSAGE);
+										exception.getMessage(), "Acción no autorizada",
+										JOptionPane.WARNING_MESSAGE);
 							}
 						}
 					});
@@ -150,10 +157,16 @@ public class ConsultarSolicitudes extends JDialog {
 						btnRechazar.addActionListener(new ActionListener() {
 							public void actionPerformed(ActionEvent e) {
 								if(seleccionado != null && BolsaLaboral.getInstancia().esProcesable(seleccionado)) {
+									try {
 									BolsaLaboral.getInstancia().rechazarCandidato(seleccionado);
 									JOptionPane.showMessageDialog(ConsultarSolicitudes.this,"Rechazo procesado satisfactoriamente.","Información",JOptionPane.INFORMATION_MESSAGE);
 									cargarSolicitudes();
 									filtrar();
+									} catch (SecurityException exception) {
+										JOptionPane.showMessageDialog(ConsultarSolicitudes.this,
+												exception.getMessage(), "Acción no autorizada",
+												JOptionPane.WARNING_MESSAGE);
+									}
 								}
 								else {
 									JOptionPane.showMessageDialog(ConsultarSolicitudes.this,
@@ -204,10 +217,12 @@ public class ConsultarSolicitudes extends JDialog {
 	    btnRechazar.setEnabled(false);
 	    
 	    for (Solicitud aux : BolsaLaboral.getInstancia().getSolicitudes()) {
-	    	if (aux == null) {
-	    		continue;
-	    	}
-	    	String estado = aux.getEstado() == null ? "" : aux.getEstado();
+		if (aux == null || aux.getSolicitante() == null
+				|| aux.getOfertaSolicitada() == null
+				|| aux.getOfertaSolicitada().getOfertador() == null) {
+			continue;
+		}
+		String estado = aux.getEstado() == null ? "" : aux.getEstado();
 	        boolean coincide =
 	            aux.getCodigo().toLowerCase().contains(filtro) ||
 	            aux.getOfertaSolicitada().getPuesto().toLowerCase().contains(filtro) ||
@@ -231,7 +246,9 @@ public class ConsultarSolicitudes extends JDialog {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
 		for (Solicitud aux : BolsaLaboral.getInstancia().getSolicitudes()) {
-			if (aux == null) {
+			if (aux == null || aux.getSolicitante() == null
+					|| aux.getOfertaSolicitada() == null
+					|| aux.getOfertaSolicitada().getOfertador() == null) {
 				continue;
 			}
             row[0] = aux.getCodigo();
@@ -245,8 +262,18 @@ public class ConsultarSolicitudes extends JDialog {
 
 	private void actualizarBotones() {
 		BolsaLaboral bolsa = BolsaLaboral.getInstancia();
-		btnRechazar.setEnabled(bolsa.esProcesable(seleccionado));
-		btnContratar.setEnabled(bolsa.puedeContratarCandidato(seleccionado));
+		boolean autorizado = AutorizacionService.tienePermiso(
+				bolsa.getUsuarioActual(), Permiso.PROCESAR_SOLICITUDES);
+		boolean procesable = bolsa.esProcesable(seleccionado);
+		boolean contratar = bolsa.puedeContratarCandidato(seleccionado);
+		btnRechazar.setEnabled(autorizado && procesable);
+		btnContratar.setEnabled(contratar);
+		btnRechazar.setToolTipText(!autorizado ? "No tiene permiso para procesar solicitudes."
+				: procesable ? "Rechazar la solicitud seleccionada."
+				: "Solo se puede rechazar una solicitud Enviada.");
+		btnContratar.setToolTipText(!autorizado ? "No tiene permiso para procesar solicitudes."
+				: contratar ? "Aprobar y ocupar una vacante."
+				: "La solicitud debe estar Enviada y la oferta debe tener una vacante disponible.");
 	}
 
 }

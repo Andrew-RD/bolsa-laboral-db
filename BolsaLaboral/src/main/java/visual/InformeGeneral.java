@@ -1,6 +1,8 @@
 package visual;
 
 import logico.BolsaLaboral;
+import logico.AutorizacionService;
+import logico.Permiso;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -27,6 +29,8 @@ public class InformeGeneral extends JDialog {
     private JLabel lblOfVacias;
 
     public InformeGeneral() {
+        AutorizacionService.exigirPermiso(
+                BolsaLaboral.getInstancia().getUsuarioActual(), Permiso.VER_INFORMES);
         setTitle("Informe General");
         setIconImage(UIUtils.image("icono.png"));
 
@@ -103,16 +107,17 @@ public class InformeGeneral extends JDialog {
     }
 
     private void cargarValores() {
-        int cantCand = BolsaLaboral.getInstancia().getCandidatos().size();
+        int cantCand = contarNoNulos(BolsaLaboral.getInstancia().getCandidatos());
         lblCandidatos.setText(formatNumero(cantCand) + (cantCand != 1 ? " Candidatos" : " Candidato"));
-        int cantOfertas = BolsaLaboral.getInstancia().getOfertas().size();
+        int cantOfertas = contarNoNulos(BolsaLaboral.getInstancia().getOfertas());
         lblOfertas.setText(formatNumero(cantOfertas) + (cantOfertas != 1 ? " Ofertas" : " Oferta"));
-        int cantCentros = BolsaLaboral.getInstancia().getCentros().size();
+        int cantCentros = contarNoNulos(BolsaLaboral.getInstancia().getCentros());
         lblEmpresas.setText(formatNumero(cantCentros) + (cantCentros != 1 ? " Empresas" : " Empresa"));
         int cantSolicitudes = contarNoNulos(BolsaLaboral.getInstancia().getSolicitudes());
         lblSolicitudes.setText(formatNumero(cantSolicitudes)
                 + (cantSolicitudes != 1 ? " Solicitudes" : " Solicitud"));
-        int cantVacCompletadas = contarNoNulos(BolsaLaboral.getInstancia().getVacantes());
+        int cantVacCompletadas =
+                BolsaLaboral.getInstancia().contarVacantesOcupadasTotales();
         lblContratados.setText(formatNumero(cantVacCompletadas)
                 + (cantVacCompletadas != 1 ? " Contratados" : " Contratado"));
         lblTasaCobertura.setText(BolsaLaboral.getInstancia().calcularTasaCovertura() + "% De Cobertura");

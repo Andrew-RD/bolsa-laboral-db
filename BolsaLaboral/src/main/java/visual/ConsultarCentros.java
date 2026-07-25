@@ -54,6 +54,8 @@ public class ConsultarCentros extends JDialog {
 	 * Create the dialog.
 	 */
 	public ConsultarCentros() {
+		AutorizacionService.exigirPermiso(BolsaLaboral.getInstancia().getUsuarioActual(),
+				Permiso.CONSULTAR_CENTROS);
 		setTitle("Listado de Centros");
 		setIconImage(UIUtils.image("icono.png"));
 		getContentPane().setLayout(new BorderLayout());
@@ -225,9 +227,12 @@ public class ConsultarCentros extends JDialog {
 	    btnDelete.setEnabled(false);
 	    btnUpdate.setEnabled(false);
 	    btnVisualizar.setEnabled(false);
-	    
+
 	    for (CentroEmpleador aux : BolsaLaboral.getInstancia().getCentros()) {
-	        boolean coincide = 
+		if (aux == null) {
+			continue;
+		}
+	        boolean coincide =
 	            aux.getCodigo().toLowerCase().contains(filtro) ||
 	            aux.getNombre().toLowerCase().contains(filtro) ||
 	            aux.getRnc().toLowerCase().contains(filtro) ||
@@ -248,6 +253,9 @@ public class ConsultarCentros extends JDialog {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
 		for (CentroEmpleador aux : BolsaLaboral.getInstancia().getCentros()) {
+			if (aux == null) {
+				continue;
+			}
             row[0] = aux.getCodigo();
             row[1] = aux.getNombre();
             row[2] = aux.getRnc();

@@ -3,11 +3,17 @@ package visual;
 import logico.BolsaLaboral;
 import logico.CentroEmpleador;
 import logico.OfertaLaboral;
+import logico.Permiso;
+import logico.Solicitud;
 import logico.Universitario;
 import logico.Usuario;
+import logico.RolUsuario;
 
 import javax.imageio.ImageIO;
 import javax.swing.JDialog;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
@@ -20,6 +26,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.EnumSet;
 
 /** Smoke test gráfico manual; no modifica datos persistidos ni lógica de negocio. */
 public final class VisualSmoke {
@@ -73,18 +80,19 @@ public final class VisualSmoke {
 
         centro = new CentroEmpleador("CEN-TEST", "Centro de Pruebas", "Tecnología",
                 "Distrito Nacional", "Santo Domingo", "8095551234",
-                "contacto@example.com", "123456789");
+                "contacto@example.com", "101010101");
         bolsa.registrarCentroTrabajo(centro);
 
         ArrayList<String> idiomas = new ArrayList<String>();
         idiomas.add("Español");
         idiomas.add("Inglés");
-        candidato = new Universitario("CAN-TEST", "00100100100", "Ana María", "Pérez Gómez",
+        candidato = new Universitario("CAN-TEST", "00100000009", "Ana María", "Pérez Gómez",
                 LocalDate.of(1995, 5, 20), "Femenino", "Distrito Nacional", "Santo Domingo",
                 "8095559876", "ana@example.com", "Tiempo Completo", "Presencial", "TI",
                 45000.0f, true, false, idiomas, "PUCMM", "Ingeniería de Sistemas",
                 "Grado", "Desempleado");
         bolsa.registrarCandidato(candidato);
+        candidato.migrarUniversidadDeserializada(bolsa.getCatalogos());
 
         ArrayList<String> requisitos = new ArrayList<String>();
         requisitos.add("Ingeniería de Sistemas");
@@ -97,7 +105,10 @@ public final class VisualSmoke {
 
     private static void runAllWindows() {
         checkWindow("Login", new Login());
-        checkWindow("Principal", new Principal());
+        Principal principalAdmin = new Principal();
+        assertMenu(principalAdmin, "Gestión de Datos", true);
+        assertMenu(principalAdmin, "Gestión de Usuarios", true);
+        checkWindow("Principal admin", principalAdmin);
         checkWindow("CV", new CV(candidato));
         checkWindow("ConsultarCandidatos", new ConsultarCandidatos());
         checkWindow("ConsultarCentros", new ConsultarCentros());
@@ -106,11 +117,71 @@ public final class VisualSmoke {
         checkWindow("InformeGeneral", new InformeGeneral());
         checkWindow("InformeOferta", new InformeOferta(oferta));
         checkWindow("ProcesamientoAvanzado", new ProcesamientoAvanzado());
-        checkWindow("RegistroCandidato", new RegistroCandidato(null));
+        RegistroCandidato registroCandidato = new RegistroCandidato(null);
+        assertLabel(registroCandidato,
+                "Desempleado — se actualiza automáticamente al aprobar una solicitud");
+        assertComboItem(registroCandidato,
+                "PUCMM — Pontificia Universidad Católica Madre y Maestra");
+        checkWindow("RegistroCandidato", registroCandidato);
+        RegistroCandidato modificarCandidato =
+                new RegistroCandidato(candidato);
+        assertLabel(modificarCandidato,
+                candidato.getDescripcionEstadoLaboral());
+        checkWindow("ModificarCandidato", modificarCandidato);
         checkWindow("RegistroCentro", new RegistroCentro(null));
         checkWindow("RegistroOfertaLaboral", new RegistroOfertaLaboral((OfertaLaboral) null));
+        checkWindow("RegistroUsuario", new RegistroUsuario(null));
+        checkWindow("ConsultarUsuarios", new ConsultarUsuarios());
+        checkWindow("GestionCatalogos", new GestionCatalogos());
         checkWindow("ResultadosVinculacion", new ResultadosVinculacion(oferta));
         checkWindow("VistaCentro", new VistaCentro(centro));
+
+        BolsaLaboral bolsa = BolsaLaboral.getInstancia();
+        Usuario admin = bolsa.getUsuarioActual();
+        Usuario empleado = new Usuario("Empleado de prueba", "empleado-menu",
+                "empleado-menu@example.test", RolUsuario.EMPLEADO, true,
+                "ClaveTemporal1".toCharArray());
+        bolsa.regUsuario(empleado);
+        bolsa.setUsuarioActual(empleado);
+        Principal principalEmpleado = new Principal();
+        assertMenu(principalEmpleado, "Gestión de Datos", false);
+        assertMenu(principalEmpleado, "Gestión de Usuarios", false);
+        checkWindow("Principal empleado", principalEmpleado);
+
+        ConsultarOfertas ofertasEmpleado = new ConsultarOfertas();
+        assertButtonVisible(ofertasEmpleado, "Procesar", false);
+        checkWindow("ConsultarOfertas empleado sin permiso avanzado",
+                ofertasEmpleado);
+
+        EnumSet<Permiso> permisosEmpleado = empleado.getPermisos();
+        permisosEmpleado.add(Permiso.USAR_PROCESAMIENTO_AVANZADO);
+        empleado.setPermisos(permisosEmpleado);
+        Principal principalEmpleadoAutorizado = new Principal();
+        assertMenu(principalEmpleadoAutorizado, "Gestión de Datos", true);
+        checkWindow("Principal empleado con procesamiento avanzado",
+                principalEmpleadoAutorizado);
+        ConsultarOfertas ofertasEmpleadoAutorizado = new ConsultarOfertas();
+        assertButtonVisible(ofertasEmpleadoAutorizado, "Procesar", true);
+        checkWindow("ConsultarOfertas empleado autorizado",
+                ofertasEmpleadoAutorizado);
+        bolsa.setUsuarioActual(admin);
+
+        bolsa.getCandidatos().clear();
+        bolsa.getCentros().clear();
+        bolsa.getOfertas().clear();
+        bolsa.getSolicitudes().clear();
+        bolsa.getVacantes().clear();
+        bolsa.getCandidatos().add(null);
+        bolsa.getCentros().add(null);
+        bolsa.getOfertas().add(null);
+        bolsa.getSolicitudes().add(null);
+        bolsa.getSolicitudes().add(new Solicitud(
+                "SOL-LEGADA-INCOMPLETA", LocalDate.now(), "Enviada", null, null));
+        checkWindow("ConsultarCandidatos vacío", new ConsultarCandidatos());
+        checkWindow("ConsultarCentros vacío", new ConsultarCentros());
+        checkWindow("ConsultarOfertas vacío", new ConsultarOfertas());
+        checkWindow("ConsultarSolicitudes vacío", new ConsultarSolicitudes());
+        checkWindow("InformeGeneral vacío", new InformeGeneral());
     }
 
     private static void checkWindow(String name, Window window) {
@@ -145,6 +216,93 @@ public final class VisualSmoke {
             }
         }
         return count;
+    }
+
+    private static void assertMenu(Principal principal, String nombre, boolean esperado) {
+        boolean encontrado = false;
+        for (int index = 0; index < principal.getJMenuBar().getMenuCount(); index++) {
+            if (principal.getJMenuBar().getMenu(index) != null
+                    && nombre.equals(principal.getJMenuBar().getMenu(index).getText())) {
+                encontrado = true;
+                break;
+            }
+        }
+        if (encontrado != esperado) {
+            throw new AssertionError("Visibilidad incorrecta del menú " + nombre
+                    + ": esperado=" + esperado + ", actual=" + encontrado);
+        }
+    }
+
+    private static void assertLabel(Container container, String texto) {
+        if (!containsLabel(container, texto)) {
+            throw new AssertionError("No se encontró el texto visible: " + texto);
+        }
+    }
+
+    private static boolean containsLabel(Container container, String texto) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JLabel
+                    && texto.equals(((JLabel) component).getText())) {
+                return true;
+            }
+            if (component instanceof Container
+                    && containsLabel((Container) component, texto)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void assertButtonVisible(
+            Container container, String texto, boolean esperado) {
+        JButton boton = findButton(container, texto);
+        if (boton == null || boton.isVisible() != esperado) {
+            throw new AssertionError("Visibilidad incorrecta del botón " + texto
+                    + ": esperado=" + esperado + ", botón=" + boton);
+        }
+    }
+
+    private static JButton findButton(Container container, String texto) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JButton
+                    && texto.equals(((JButton) component).getText())) {
+                return (JButton) component;
+            }
+            if (component instanceof Container) {
+                JButton encontrado = findButton(
+                        (Container) component, texto);
+                if (encontrado != null) {
+                    return encontrado;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void assertComboItem(Container container, String texto) {
+        if (!containsComboItem(container, texto)) {
+            throw new AssertionError(
+                    "No se encontró el elemento de ComboBox: " + texto);
+        }
+    }
+
+    private static boolean containsComboItem(
+            Container container, String texto) {
+        for (Component component : container.getComponents()) {
+            if (component instanceof JComboBox) {
+                JComboBox combo = (JComboBox) component;
+                for (int index = 0; index < combo.getItemCount(); index++) {
+                    if (texto.equals(String.valueOf(combo.getItemAt(index)))) {
+                        return true;
+                    }
+                }
+            }
+            if (component instanceof Container
+                    && containsComboItem((Container) component, texto)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void captureLogin(final String outputPath) throws Exception {

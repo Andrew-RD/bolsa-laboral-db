@@ -43,12 +43,18 @@ public class ResultadosVinculacion extends JDialog {
 	public static Object[] row;
 	private ResultadoMatcheo seleccionado = null;
 	private JButton btnContratar;
+	private JLabel lblRazonProcesamiento;
 	private static ArrayList<ResultadoMatcheo> resultados = new ArrayList<>();
 
 	/**
 	 * Create the dialog.
 	 */
 	 public ResultadosVinculacion(OfertaLaboral ofertaVinculada) {
+		 DecisionProcesamiento decisionInicial = BolsaLaboral.getInstancia()
+				 .evaluarProcesamiento(ofertaVinculada);
+		 if (!decisionInicial.isPermitido()) {
+			 throw new IllegalStateException(decisionInicial.getRazon());
+		 }
 		 setTitle("Resultados de la Vinculación");
 		 setIconImage(UIUtils.image("icono.png"));
 		 getContentPane().setLayout(new BorderLayout());
@@ -75,7 +81,7 @@ public class ResultadosVinculacion extends JDialog {
 							 int index = table.getSelectedRow();
 							 if(index >= 0) {
 								 seleccionado = BolsaLaboral.getInstancia().buscarResultado(resultados,ofertaVinculada.getCodigo(),table.getValueAt(index,0).toString());
-								 btnContratar.setEnabled(true);
+								 actualizarBoton();
 							 }
 						 }
 					 });
@@ -105,11 +111,19 @@ public class ResultadosVinculacion extends JDialog {
 			 }
 		 }
 		 {
+			 JPanel pie = new JPanel(new BorderLayout());
+			 pie.setBackground(new Color(4, 87, 87));
+			 getContentPane().add(pie, BorderLayout.SOUTH);
+			 lblRazonProcesamiento = new JLabel(" ");
+			 lblRazonProcesamiento.setForeground(Color.WHITE);
+			 lblRazonProcesamiento.setFont(UIUtils.defaultFont(Font.PLAIN));
+			 lblRazonProcesamiento.setBorder(UIUtils.emptyBorder(4, 10, 2, 10));
+			 pie.add(lblRazonProcesamiento, BorderLayout.NORTH);
 			 JPanel buttonPane = new JPanel();
 			 buttonPane.setBackground(new Color(4, 87, 87));
 			 buttonPane.setBorder(new TitledBorder(null, "", TitledBorder.LEADING, TitledBorder.TOP, null, null));
 			 buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
-			 getContentPane().add(buttonPane, BorderLayout.SOUTH);
+			 pie.add(buttonPane, BorderLayout.SOUTH);
 			 {
 				 btnContratar = new JButton("Vincular");
 				 btnContratar.setBackground(Color.WHITE);
@@ -117,16 +131,32 @@ public class ResultadosVinculacion extends JDialog {
 				 btnContratar.setFont(UIUtils.largeFont(Font.BOLD));
 				 btnContratar.addActionListener(new ActionListener() {
 					 public void actionPerformed(ActionEvent e) {
-						 if(seleccionado.getOferta().getVacantes() > 0) {
-							 if(BolsaLaboral.getInstancia().vincularOferta(seleccionado)) {
-								 JOptionPane.showMessageDialog(null,"Se ha creado la solicitud correctamente a la oferta " + seleccionado.getOferta().getPuesto() + ".","Información",JOptionPane.INFORMATION_MESSAGE);
-							 } else {
-								 JOptionPane.showMessageDialog(null,"Esta solicitud ya existe.","Información",JOptionPane.INFORMATION_MESSAGE);
+						 DecisionProcesamiento decision = BolsaLaboral.getInstancia()
+								 .evaluarVinculacion(seleccionado);
+						 if (!decision.isPermitido()) {
+							 JOptionPane.showMessageDialog(ResultadosVinculacion.this,
+									 decision.getRazon(), "No se puede vincular",
+									 JOptionPane.WARNING_MESSAGE);
+							 actualizarBoton();
+							 return;
+						 }
+						 try {
+							 if (BolsaLaboral.getInstancia().vincularOferta(seleccionado)) {
+								 JOptionPane.showMessageDialog(ResultadosVinculacion.this,
+										 "Se ha creado la solicitud correctamente a la oferta "
+												 + seleccionado.getOferta().getPuesto() + ".",
+										 "Información", JOptionPane.INFORMATION_MESSAGE);
 							 }
+						 } catch (SecurityException exception) {
+							 JOptionPane.showMessageDialog(ResultadosVinculacion.this,
+									 exception.getMessage(), "Acción no autorizada",
+									 JOptionPane.WARNING_MESSAGE);
 						 }
-						 else {
-							 JOptionPane.showMessageDialog(null,"El candidato no puede ser vinculado ya que no hay vacantes disponibles.","Advertencia",JOptionPane.WARNING_MESSAGE);
-						 }
+						 resultados = BolsaLaboral.getInstancia()
+								 .obtenerCandidatosOrdenadosParaOferta(ofertaVinculada);
+						 cargarResultados(ofertaVinculada);
+						 seleccionado = null;
+						 actualizarBoton();
 					 }
 				 });
 				 btnContratar.setEnabled(false);
@@ -149,6 +179,7 @@ public class ResultadosVinculacion extends JDialog {
 
 		 resultados = BolsaLaboral.getInstancia().obtenerCandidatosOrdenadosParaOferta(ofertaVinculada);
 		 cargarResultados(ofertaVinculada);
+		 actualizarBoton();
 		 UIUtils.finishDialog(this, getOwner(), 720, 520);
 	 }
 
@@ -162,6 +193,15 @@ public class ResultadosVinculacion extends JDialog {
 			 row[3] = UIUtils.valueIcon(aux.getCondicion());
 			 modelo.addRow(row);
 		 }
+	 }
+
+	 private void actualizarBoton() {
+		 DecisionProcesamiento decision = BolsaLaboral.getInstancia()
+				 .evaluarVinculacion(seleccionado);
+		 btnContratar.setEnabled(decision.isPermitido());
+		 btnContratar.setToolTipText(decision.getRazon());
+		 lblRazonProcesamiento.setText("Vinculación: " + decision.getRazon());
+		 lblRazonProcesamiento.setToolTipText(decision.getRazon());
 	 }
 
 }

@@ -9,19 +9,60 @@ public class Universitario extends Candidato implements Serializable{
 	private static final long serialVersionUID = 1L;
 	
 	private String universidad;
+	private String universidadIdentificador;
 	private String carrera;
 	private String nivelAcademico;
+	private SituacionAcademica situacionAcademica;
 
 	public Universitario(String codigo, String identificacion, String nombres, String apellidos,
 			LocalDate fechaNacimiento, String genero, String provincia, String municipio, String telefono,
 			String correo, String jornada, String modalidad, String areaDeInteres, float aspiracionSalarial,
 			boolean licenciaConducir, boolean disposicionMudarse, ArrayList<String> idiomas,String universidad, String carrera, String nivelAcademico, String estado) {
+		this(codigo, identificacion, nombres, apellidos, fechaNacimiento, genero, provincia, municipio,
+				telefono, correo, jornada, modalidad, areaDeInteres, aspiracionSalarial,
+				licenciaConducir, disposicionMudarse, idiomas, universidad, carrera, nivelAcademico,
+				SituacionAcademica.NO_ESPECIFICADO, estado);
+	}
+
+	public Universitario(String codigo, String identificacion, String nombres, String apellidos,
+			LocalDate fechaNacimiento, String genero, String provincia, String municipio, String telefono,
+			String correo, String jornada, String modalidad, String areaDeInteres, float aspiracionSalarial,
+			boolean licenciaConducir, boolean disposicionMudarse, ArrayList<String> idiomas,
+			String universidad, String carrera, String nivelAcademico,
+			SituacionAcademica situacionAcademica, String estado) {
 		super(codigo, identificacion, nombres, apellidos, fechaNacimiento, genero, provincia, municipio, telefono,
 				correo, jornada, modalidad, areaDeInteres, aspiracionSalarial, licenciaConducir, disposicionMudarse,
 				idiomas, estado);
 		this.universidad = universidad;
 		this.carrera = carrera;
 		this.nivelAcademico = nivelAcademico;
+		this.situacionAcademica = situacionAcademica;
+	}
+
+	public int migrarSituacionDeserializada() {
+		if (situacionAcademica == null) {
+			situacionAcademica = SituacionAcademica.NO_ESPECIFICADO;
+			return 1;
+		}
+		return 0;
+	}
+
+	public int migrarUniversidadDeserializada(CatalogoDatos catalogos) {
+		if (catalogos == null) {
+			return 0;
+		}
+		ElementoCatalogo porIdentificador = catalogos.buscarPorIdentificador(
+				TipoCatalogo.UNIVERSIDADES, universidadIdentificador);
+		if (porIdentificador != null) {
+			return 0;
+		}
+		ElementoCatalogo porTexto = catalogos.buscarUniversidad(universidad);
+		if (porTexto != null && !porTexto.getIdentificador().equals(
+				universidadIdentificador)) {
+			universidadIdentificador = porTexto.getIdentificador();
+			return 1;
+		}
+		return 0;
 	}
 
 
@@ -31,6 +72,24 @@ public class Universitario extends Candidato implements Serializable{
 
 	public void setUniversidad(String universidad) {
 		this.universidad = universidad;
+	}
+
+	public String getUniversidadIdentificador() {
+		return universidadIdentificador;
+	}
+
+	public void setUniversidadCatalogo(ElementoCatalogo universidadCatalogo) {
+		if (universidadCatalogo == null) {
+			universidadIdentificador = null;
+			return;
+		}
+		universidadIdentificador = universidadCatalogo.getIdentificador();
+		universidad = universidadCatalogo.getNombreCompleto();
+	}
+
+	public void setUniversidadLegada(String universidadLegada) {
+		universidadIdentificador = null;
+		universidad = universidadLegada;
 	}
 
 	public String getCarrera() {
@@ -49,11 +108,24 @@ public class Universitario extends Candidato implements Serializable{
 		this.nivelAcademico = nivelAcademico;
 	}
 
+	public SituacionAcademica getSituacionAcademica() {
+		if (situacionAcademica == null) {
+			situacionAcademica = SituacionAcademica.NO_ESPECIFICADO;
+		}
+		return situacionAcademica;
+	}
+
+	public void setSituacionAcademica(SituacionAcademica situacionAcademica) {
+		this.situacionAcademica = situacionAcademica == null
+				? SituacionAcademica.NO_ESPECIFICADO : situacionAcademica;
+	}
+
 
 	@Override
 	public String getSobreMi() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Soy estudiante de ").append(getCarrera().toLowerCase())
+		sb.append("Soy ").append(getSituacionAcademica().getEtiqueta().toLowerCase())
+		.append(" de ").append(getCarrera().toLowerCase())
 		.append(" en la universidad ").append(getUniversidad())
 		.append(", con nivel académico ").append(getNivelAcademico().toLowerCase()).append(". ");
 		sb.append("Mi área de interés es ").append(getAreaDeInteres().toLowerCase()).append(". ");
@@ -82,7 +154,7 @@ public class Universitario extends Candidato implements Serializable{
 	@Override
 	public String getFormacion() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Estoy cursando estudios universitarios en la carrera de ").append(getCarrera().toLowerCase())
+		sb.append("Formación universitaria en la carrera de ").append(getCarrera().toLowerCase())
 		.append(" en la universidad ").append(getUniversidad()).append(". ");
 		sb.append("Mi nivel académico actual es ").append(getNivelAcademico().toLowerCase()).append(". ");
 

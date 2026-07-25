@@ -51,11 +51,14 @@ public class ConsultarOfertas extends JDialog {
 	private JTextField txtFiltro;
 	private JButton btnVincular;
 	private JButton btnVerInforme;
+	private JLabel lblRazonProcesamiento;
 	
 	/**
 	 * Create the dialog.
 	 */
 	public ConsultarOfertas() {
+		AutorizacionService.exigirPermiso(BolsaLaboral.getInstancia().getUsuarioActual(),
+				Permiso.CONSULTAR_OFERTAS);
 		setTitle("Listado de Ofertas Laborales");
 		setIconImage(UIUtils.image("icono.png"));
 		getContentPane().setLayout(new BorderLayout());
@@ -82,10 +85,7 @@ public class ConsultarOfertas extends JDialog {
 							int index = table.getSelectedRow();
 							if(index >= 0) {
 								seleccionado = BolsaLaboral.getInstancia().buscarOfertaByCodigo(table.getValueAt(index, 0).toString());
-								btnDelete.setEnabled(true);
-								btnUpdate.setEnabled(true);
-								btnVincular.setEnabled(true);
-								btnVerInforme.setEnabled(true);
+								actualizarBotones();
 							}
 						}
 					});
@@ -126,21 +126,25 @@ public class ConsultarOfertas extends JDialog {
 			}
 		}
 		{
+			JPanel pie = new JPanel(new BorderLayout());
+			pie.setBackground(new Color(4, 87, 87));
+			getContentPane().add(pie, BorderLayout.SOUTH);
+			lblRazonProcesamiento = new JLabel(" ");
+			lblRazonProcesamiento.setForeground(Color.WHITE);
+			lblRazonProcesamiento.setFont(UIUtils.defaultFont(Font.PLAIN));
+			lblRazonProcesamiento.setBorder(UIUtils.emptyBorder(4, 10, 2, 10));
+			pie.add(lblRazonProcesamiento, BorderLayout.NORTH);
 			JPanel buttonPane = new JPanel();
 			buttonPane.setBackground(new Color(4, 87, 87));
 			buttonPane.setBorder(new TitledBorder(null, "", TitledBorder.LEADING, TitledBorder.TOP, null, null));
 			buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
-			getContentPane().add(buttonPane, BorderLayout.SOUTH);
+			pie.add(buttonPane, BorderLayout.SOUTH);
 			{
 				btnUpdate = new JButton("Modificar");
 				btnUpdate.setBackground(Color.WHITE);
 				btnUpdate.setIcon(UIUtils.icon("modificar.png"));
 				btnUpdate.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
-						btnDelete.setEnabled(true);
-						btnUpdate.setEnabled(true);
-						btnVincular.setEnabled(true);
-						btnVerInforme.setEnabled(true);
 						RegistroOfertaLaboral registro = new RegistroOfertaLaboral(seleccionado);
 						registro.setLocationRelativeTo(ConsultarOfertas.this);
 						registro.setVisible(true);
@@ -152,12 +156,27 @@ public class ConsultarOfertas extends JDialog {
 					btnVincular.setBackground(Color.WHITE);
 					btnVincular.addActionListener(new ActionListener() {
 						public void actionPerformed(ActionEvent e) {
-						ResultadosVinculacion res = new ResultadosVinculacion(seleccionado);
-						ResultadosVinculacion.cargarResultados(seleccionado);
-						res.setModal(true);
-						res.setLocationRelativeTo(ConsultarOfertas.this);
-							res.setVisible(true);
-							
+							DecisionProcesamiento decision = BolsaLaboral.getInstancia()
+									.evaluarProcesamiento(seleccionado);
+							if (!decision.isPermitido()) {
+								JOptionPane.showMessageDialog(ConsultarOfertas.this,
+										decision.getRazon(), "No se puede procesar",
+										JOptionPane.WARNING_MESSAGE);
+								actualizarBotones();
+								return;
+							}
+							try {
+								ResultadosVinculacion res = new ResultadosVinculacion(seleccionado);
+								res.setModal(true);
+								res.setLocationRelativeTo(ConsultarOfertas.this);
+								res.setVisible(true);
+								cargarOfertas();
+								actualizarBotones();
+							} catch (IllegalStateException | SecurityException exception) {
+								JOptionPane.showMessageDialog(ConsultarOfertas.this,
+										exception.getMessage(), "No se puede procesar",
+										JOptionPane.WARNING_MESSAGE);
+							}
 						}
 					});
 					{
@@ -198,15 +217,11 @@ public class ConsultarOfertas extends JDialog {
 						if(seleccionado != null) {
 							int option = JOptionPane.showConfirmDialog(null, "¿Esta seguro que desea eliminar la oferta al puesto de " + seleccionado.getPuesto() + " que posee el ID: "+seleccionado.getCodigo()+"?", "Eliminar", JOptionPane.WARNING_MESSAGE);
 							if(option == JOptionPane.OK_OPTION){
-								btnDelete.setEnabled(true);
-								btnUpdate.setEnabled(true);
-								btnVincular.setEnabled(true);
-								btnVerInforme.setEnabled(true);
 								try {
 									BolsaLaboral.getInstancia().eliminarOfertaTrabajo(seleccionado);
 									cargarOfertas();
 								}
-								catch (NotRemovableException ex) {
+								catch (NotRemovableException | SecurityException ex) {
 									JOptionPane.showMessageDialog(null,ex.getMessage(),"Advertencia",JOptionPane.ERROR_MESSAGE);
 								}	
 							}
@@ -232,6 +247,7 @@ public class ConsultarOfertas extends JDialog {
 		}
 
 		cargarOfertas();
+		actualizarBotones();
 		UIUtils.finishDialog(this, getOwner(), 920, 540);
 	}
 	
@@ -245,9 +261,15 @@ public class ConsultarOfertas extends JDialog {
 	    btnUpdate.setEnabled(false);
 	    btnVincular.setEnabled(false);
 	    btnVerInforme.setEnabled(false);
-	    
+	    btnVincular.setToolTipText("Debe seleccionar una oferta.");
+	    actualizarRazonProcesamiento(
+				BolsaLaboral.getInstancia().evaluarProcesamiento(null));
+
 	    for (OfertaLaboral aux : BolsaLaboral.getInstancia().getOfertas()) {
-	        boolean coincide = 
+		if (aux == null || aux.getOfertador() == null) {
+			continue;
+		}
+	        boolean coincide =
 	            aux.getCodigo().toLowerCase().contains(filtro) ||
 	            aux.getOfertador().getNombre().toLowerCase().contains(filtro) ||
 	            aux.getPuesto().toLowerCase().contains(filtro) ||
@@ -264,11 +286,42 @@ public class ConsultarOfertas extends JDialog {
 	        }
 	    }
 	}
+
+	private void actualizarBotones() {
+		BolsaLaboral bolsa = BolsaLaboral.getInstancia();
+		Usuario usuario = bolsa.getUsuarioActual();
+		boolean haySeleccion = seleccionado != null;
+		boolean gestiona = AutorizacionService.tienePermiso(usuario, Permiso.GESTIONAR_OFERTAS);
+		boolean procesamientoAvanzado = AutorizacionService.tienePermiso(
+				usuario, Permiso.USAR_PROCESAMIENTO_AVANZADO);
+		btnDelete.setEnabled(haySeleccion && gestiona);
+		btnUpdate.setEnabled(haySeleccion && gestiona);
+		btnVerInforme.setEnabled(haySeleccion
+				&& AutorizacionService.tienePermiso(usuario, Permiso.VER_INFORMES));
+		DecisionProcesamiento decision = bolsa.evaluarProcesamiento(seleccionado);
+		btnVincular.setVisible(procesamientoAvanzado);
+		lblRazonProcesamiento.setVisible(procesamientoAvanzado);
+		btnVincular.setEnabled(procesamientoAvanzado
+				&& haySeleccion && decision.isPermitido());
+		btnVincular.setToolTipText(decision.getRazon());
+		actualizarRazonProcesamiento(decision);
+	}
+
+	private void actualizarRazonProcesamiento(DecisionProcesamiento decision) {
+		if (lblRazonProcesamiento != null && decision != null) {
+			lblRazonProcesamiento.setText(
+					"Procesamiento: " + decision.getRazon());
+			lblRazonProcesamiento.setToolTipText(decision.getRazon());
+		}
+	}
 	
 	public static void cargarOfertas() {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
 		for (OfertaLaboral aux : BolsaLaboral.getInstancia().getOfertas()) {
+			if (aux == null || aux.getOfertador() == null) {
+				continue;
+			}
             row[0] = aux.getCodigo();
             row[1] = aux.getPuesto();
             row[2] = aux.getOfertador().getNombre();

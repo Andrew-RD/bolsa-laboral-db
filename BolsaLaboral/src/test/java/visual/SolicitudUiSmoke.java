@@ -6,6 +6,8 @@ import logico.CentroEmpleador;
 import logico.Obrero;
 import logico.OfertaLaboral;
 import logico.Solicitud;
+import logico.RolUsuario;
+import logico.Usuario;
 
 import javax.imageio.ImageIO;
 import javax.swing.JButton;
@@ -161,7 +163,7 @@ public final class SolicitudUiSmoke {
         idiomas.add("Español");
         ArrayList<String> habilidades = new ArrayList<String>();
         habilidades.add("Limpieza");
-        candidato = new Obrero("CAN-UI", "00100000001", "Ana", "Pérez",
+        candidato = new Obrero("CAN-UI", "00100000009", "Ana", "Pérez",
                 LocalDate.of(1990, 1, 1), "Femenino", "Distrito Nacional", "Santo Domingo",
                 "8095550101", "ana@example.com", "Tiempo Completo", "Presencial", "Limpieza",
                 20000.0f, false, false, idiomas, habilidades, Candidato.ESTADO_DESEMPLEADO);
@@ -197,5 +199,10 @@ public final class SolicitudUiSmoke {
         bolsa.getCentros().clear();
         bolsa.getVacantes().clear();
         bolsa.getUsuarios().clear();
+        Usuario admin = new Usuario("Administrador de prueba", "admin-ui",
+                "admin-ui@example.test", RolUsuario.ADMINISTRADOR, true,
+                "ClaveTemporal1".toCharArray());
+        bolsa.regUsuario(admin);
+        bolsa.setUsuarioActual(admin);
     }
 }

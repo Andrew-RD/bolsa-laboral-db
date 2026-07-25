@@ -49,6 +49,8 @@ public class ConsultarCandidatos extends JDialog {
 	 * Create the dialog.
 	 */
 	public ConsultarCandidatos() {
+		AutorizacionService.exigirPermiso(BolsaLaboral.getInstancia().getUsuarioActual(),
+				Permiso.CONSULTAR_CANDIDATOS);
 		setTitle("Listado de Candidatos");
 		setIconImage(UIUtils.image("icono.png"));
 		getContentPane().setLayout(new BorderLayout());
@@ -81,7 +83,8 @@ public class ConsultarCandidatos extends JDialog {
 							}
 						}
 					});
-					String [] headers = {"Código", "Nombre", "Cédula", "Nivel Académico"};
+					String [] headers = {"Código", "Nombre", "Cédula",
+							"Nivel Académico", "Estado laboral"};
 					modelo.setColumnIdentifiers(headers);
 					table.setModel(modelo);
 					scrollPane.setViewportView(table);
@@ -130,8 +133,8 @@ public class ConsultarCandidatos extends JDialog {
 				btnUpdate.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						RegistroCandidato registro = new RegistroCandidato(seleccionado);
-						registro.setModal(true); 
-						registro.setLocationRelativeTo(ConsultarCandidatos.this); 
+						registro.setModal(true);
+						registro.setLocationRelativeTo(ConsultarCandidatos.this);
 						registro.setVisible(true);
 						
 						cargarCandidatos();
@@ -227,43 +230,46 @@ public class ConsultarCandidatos extends JDialog {
 	    btnDelete.setEnabled(false);
 	    btnUpdate.setEnabled(false);
 	    btnVisualizar.setEnabled(false);
-	    
+
 	    for (Candidato aux : BolsaLaboral.getInstancia().getCandidatos()) {
-	        boolean coincide = 
+		if (aux == null) {
+			continue;
+		}
+	        boolean coincide =
 	            aux.getCodigo().toLowerCase().contains(filtro) ||
 	            (aux.getNombres() + " " + aux.getApellidos()).toLowerCase().contains(filtro) ||
 	            aux.getIdentificacion().toLowerCase().contains(filtro) ||
-	            getNivelAcademico(aux).toLowerCase().contains(filtro);
+	            getNivelAcademico(aux).toLowerCase().contains(filtro) ||
+	            aux.getDescripcionEstadoLaboral().toLowerCase().contains(filtro);
 	        
 	        if (coincide) {
 	            row[0] = aux.getCodigo();
 	            row[1] = aux.getNombres() + " " + aux.getApellidos();
 	            row[2] = aux.getIdentificacion();
 	            row[3] = getNivelAcademico(aux);
+	            row[4] = aux.getDescripcionEstadoLaboral();
 	            modelo.addRow(row);
 	        }
 	    }
 	}
 
 	private static String getNivelAcademico(Candidato candidato) {
-	    if (candidato instanceof Universitario) {
-	        return "Estudiante Universitario";
-	    } else if (candidato instanceof TecnicoSuperior) {
-	        return "Estudiante Técnico";
-	    } else if (candidato instanceof Obrero) {
-	        return "Obrero";
-	    }
-	    return "";
+	    return candidato == null || candidato.getTipoCandidato() == null
+			? "" : candidato.getTipoCandidato().getEtiqueta();
 	}
 	
 	public static void cargarCandidatos() {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
 		for (Candidato aux : BolsaLaboral.getInstancia().getCandidatos()) {
+			if (aux == null) {
+				continue;
+			}
 			row[0] = aux.getCodigo();
 			row[1] = aux.getNombres() + " " + aux.getApellidos();
 			row[2] = aux.getIdentificacion();
 			row[3] = getNivelAcademico(aux);
+			row[4] = aux.getDescripcionEstadoLaboral();
 			modelo.addRow(row);
 		}
 	}

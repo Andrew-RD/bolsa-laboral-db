@@ -60,6 +60,8 @@ public class ProcesamientoAvanzado extends JDialog {
 	};
 	public static Object[] rowMatcheo;
 	private ResultadoMatcheo resMatchSelec = null;
+	private OfertaLaboral ofertaSelec = null;
+	private JLabel lblRazonProcesamiento;
 	
 	private static ArrayList<OfertaLaboral> ofertas = new ArrayList<>();
 	private static ArrayList<ResultadoMatcheo> resultados = new ArrayList<>();
@@ -69,6 +71,9 @@ public class ProcesamientoAvanzado extends JDialog {
 	 * Create the dialog.
 	 */
 	public ProcesamientoAvanzado() {
+		AutorizacionService.exigirPermiso(
+				BolsaLaboral.getInstancia().getUsuarioActual(),
+				Permiso.USAR_PROCESAMIENTO_AVANZADO);
 		setTitle("Procesamiento Avanzado de Ofertas");
 		setIconImage(UIUtils.image("icono.png"));
 		getContentPane().setLayout(new BorderLayout());
@@ -90,6 +95,20 @@ public class ProcesamientoAvanzado extends JDialog {
 					tablaOfertas = new JTable();
 					tablaOfertas.setForeground(Color.BLACK);
 					UIUtils.configureTable(tablaOfertas);
+					tablaOfertas.addMouseListener(new MouseAdapter() {
+						@Override
+						public void mouseClicked(MouseEvent e) {
+							int index = tablaOfertas.getSelectedRow();
+							if (index >= 0) {
+								ofertaSelec = BolsaLaboral.getInstancia()
+										.buscarOfertaByCodigo(
+												tablaOfertas.getValueAt(index, 0).toString());
+								resMatchSelec = null;
+								tablaMatcheo.clearSelection();
+								actualizarBoton();
+							}
+						}
+					});
 					String [] headers = {"Código", "Puesto", "Ofertador", "Área", "Estado"};
 					modeloOfertas.setColumnIdentifiers(headers);
 					tablaOfertas.setModel(modeloOfertas);
@@ -110,7 +129,8 @@ public class ProcesamientoAvanzado extends JDialog {
 					int index = tablaMatcheo.getSelectedRow();
 					if(index >= 0) {
 						resMatchSelec = BolsaLaboral.getInstancia().buscarResultado(resultados,tablaMatcheo.getValueAt(index,0).toString(),tablaMatcheo.getValueAt(index,1).toString());
-						btnProcesar.setEnabled(true);
+						ofertaSelec = resMatchSelec == null ? null : resMatchSelec.getOferta();
+						actualizarBoton();
 					}
 				}
 			});
@@ -149,11 +169,19 @@ public class ProcesamientoAvanzado extends JDialog {
 			}
 		}
 		{
+			JPanel pie = new JPanel(new BorderLayout());
+			pie.setBackground(new Color(4, 87, 87));
+			getContentPane().add(pie, BorderLayout.SOUTH);
+			lblRazonProcesamiento = new JLabel(" ");
+			lblRazonProcesamiento.setForeground(Color.WHITE);
+			lblRazonProcesamiento.setFont(UIUtils.defaultFont(Font.PLAIN));
+			lblRazonProcesamiento.setBorder(UIUtils.emptyBorder(4, 10, 2, 10));
+			pie.add(lblRazonProcesamiento, BorderLayout.NORTH);
 			JPanel buttonPane = new JPanel();
 			buttonPane.setBackground(new Color(4, 87, 87));
 			buttonPane.setBorder(new TitledBorder(null, "", TitledBorder.LEADING, TitledBorder.TOP, null, null));
 			buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
-			getContentPane().add(buttonPane, BorderLayout.SOUTH);
+			pie.add(buttonPane, BorderLayout.SOUTH);
 			{
 				btnProcesar = new JButton("Procesar");
 				btnProcesar.setBackground(Color.WHITE);
@@ -161,11 +189,28 @@ public class ProcesamientoAvanzado extends JDialog {
 				btnProcesar.setFont(UIUtils.largeFont(Font.BOLD));
 				btnProcesar.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
-						if(BolsaLaboral.getInstancia().vincularOferta(resMatchSelec)) {
-							JOptionPane.showMessageDialog(null,"Se ha creado la solicitud correctamente a la oferta " + resMatchSelec.getOferta().getPuesto() + ".","Información",JOptionPane.INFORMATION_MESSAGE);
-						} else {
-							JOptionPane.showMessageDialog(null,"Esta solicitud ya existe.","Información",JOptionPane.INFORMATION_MESSAGE);
+						DecisionProcesamiento decision = BolsaLaboral.getInstancia()
+								.evaluarVinculacion(resMatchSelec);
+						if (!decision.isPermitido()) {
+							JOptionPane.showMessageDialog(ProcesamientoAvanzado.this,
+									decision.getRazon(), "No se puede procesar",
+									JOptionPane.WARNING_MESSAGE);
+							actualizarBoton();
+							return;
 						}
+						try {
+							if(BolsaLaboral.getInstancia().vincularOferta(resMatchSelec)) {
+								JOptionPane.showMessageDialog(ProcesamientoAvanzado.this,
+										"Se ha creado la solicitud correctamente a la oferta "
+												+ resMatchSelec.getOferta().getPuesto() + ".",
+										"Información", JOptionPane.INFORMATION_MESSAGE);
+							}
+						} catch (SecurityException exception) {
+							JOptionPane.showMessageDialog(ProcesamientoAvanzado.this,
+									exception.getMessage(), "Acción no autorizada",
+									JOptionPane.WARNING_MESSAGE);
+						}
+						recargarDatos();
 					}
 				});
 				btnProcesar.setEnabled(false);
@@ -190,6 +235,7 @@ public class ProcesamientoAvanzado extends JDialog {
 		ofertas = BolsaLaboral.getInstancia().ofertasDisponibles();
 		cargarResultados();
 		cargarOfertas();
+		actualizarBoton();
 		UIUtils.finishDialog(this, getOwner(), 820, 620);
 	}
 	
@@ -197,12 +243,16 @@ public class ProcesamientoAvanzado extends JDialog {
 	    String filtro = txtFiltro.getText().toLowerCase();
 	    modeloOfertas.setRowCount(0);
 	    rowOferta = new Object[tablaOfertas.getColumnCount()];
-	    btnProcesar.setEnabled(false);
+	    ofertaSelec = null;
+	    resMatchSelec = null;
 
 	    ArrayList<OfertaLaboral> ofertasVisibles = new ArrayList<>();
-	    
+
 	    for (OfertaLaboral aux : BolsaLaboral.getInstancia().getOfertas()) {
-	        boolean coincide = 
+		if (aux == null || aux.getOfertador() == null) {
+			continue;
+		}
+	        boolean coincide =
 	            aux.getCodigo().toLowerCase().contains(filtro) ||
 	            aux.getOfertador().getNombre().toLowerCase().contains(filtro) ||
 	            aux.getPuesto().toLowerCase().contains(filtro) ||
@@ -219,8 +269,9 @@ public class ProcesamientoAvanzado extends JDialog {
 	            ofertasVisibles.add(aux);
 	        }
 	    }
-	    
+
 	    actualizarResultadosFiltrados(ofertasVisibles);
+	    actualizarBoton();
 	}
 
 	private void actualizarResultadosFiltrados(ArrayList<OfertaLaboral> ofertasVisibles) {
@@ -263,5 +314,33 @@ public class ProcesamientoAvanzado extends JDialog {
 	            rowMatcheo[4] = UIUtils.valueIcon(aux.getCondicion());
 			modeloMatcheo.addRow(rowMatcheo);
 		}
+	}
+
+	private void actualizarBoton() {
+		DecisionProcesamiento decision;
+		if (resMatchSelec != null) {
+			decision = BolsaLaboral.getInstancia()
+					.evaluarVinculacion(resMatchSelec);
+		} else if (ofertaSelec != null) {
+			decision = BolsaLaboral.getInstancia()
+					.evaluarProcesamiento(ofertaSelec);
+		} else {
+			decision = DecisionProcesamiento.rechazar(
+					"Debe seleccionar una oferta y un candidato elegible.");
+		}
+		btnProcesar.setEnabled(resMatchSelec != null && decision.isPermitido());
+		btnProcesar.setToolTipText(decision.getRazon());
+		lblRazonProcesamiento.setText("Procesamiento: " + decision.getRazon());
+		lblRazonProcesamiento.setToolTipText(decision.getRazon());
+	}
+
+	private void recargarDatos() {
+		resultados = BolsaLaboral.getInstancia().procesamientoAvanzando();
+		ofertas = BolsaLaboral.getInstancia().ofertasDisponibles();
+		resMatchSelec = null;
+		ofertaSelec = null;
+		cargarResultados();
+		cargarOfertas();
+		actualizarBoton();
 	}
 }

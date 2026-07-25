@@ -33,6 +33,7 @@ public class CV extends JDialog {
     private JLabel lblJornada;
     private JLabel lblArea;
     private JLabel lblform;
+    private JLabel lblEstadoLaboral;
     private JLabel lblUbic;
     private JLabel lblTelefono;
 
@@ -62,6 +63,9 @@ public class CV extends JDialog {
         addSummaryTitle(summary, line++, " Formación", "nivel.png");
         lblform = summaryValue();
         addSummaryValue(summary, line++, lblform, 0);
+        addSummaryTitle(summary, line++, " Estado laboral", "solicitud.png");
+        lblEstadoLaboral = summaryValue();
+        addSummaryValue(summary, line++, lblEstadoLaboral, 0);
         addSummaryTitle(summary, line++, " Ubicación", "ubicacion.png");
         lblUbic = summaryValue();
         addSummaryValue(summary, line++, lblUbic, 0);
@@ -207,6 +211,9 @@ public class CV extends JDialog {
         }
         lblNombre.setText(getFormatNombre(solicitante));
         lblFechaNac.setText(solicitante.getFechaNacimiento().toString());
+        lblEstadoLaboral.setText(solicitante.getEstado());
+        lblEstadoLaboral.setToolTipText(
+                solicitante.getDescripcionEstadoLaboral());
         lblUbic.setText(getFormatUbicacion(solicitante));
         lblUbic.setToolTipText(solicitante.getMunicipio() + ", " + solicitante.getProvincia());
         lblTelefono.setText(solicitante.getTelefono());

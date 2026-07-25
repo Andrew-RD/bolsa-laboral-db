@@ -30,6 +30,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Arrays;
 
 public class Login extends JFrame {
 
@@ -240,10 +241,19 @@ public class Login extends JFrame {
 
     private Usuario verificar() throws AuthException {
         Usuario encontrado = null;
-        for (Usuario user : BolsaLaboral.getInstancia().getUsuarios()) {
-            if (user.match(txtUsuario.getText(), new String(txtContrasena.getPassword()))) {
-                encontrado = user;
+        char[] clave = txtContrasena.getPassword();
+        try {
+            for (Usuario user : BolsaLaboral.getInstancia().getUsuarios()) {
+                if (user != null && user.getNombreUsuario() != null
+                        && user.getNombreUsuario().trim().equalsIgnoreCase(
+                                txtUsuario.getText().trim())
+                        && user.autenticar(clave)) {
+                    encontrado = user;
+                    break;
+                }
             }
+        } finally {
+            Arrays.fill(clave, '\0');
         }
         if (encontrado == null) {
             throw new AuthException();

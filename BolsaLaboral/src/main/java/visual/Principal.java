@@ -1,6 +1,8 @@
 package visual;
 
 import logico.BolsaLaboral;
+import logico.AutorizacionService;
+import logico.Permiso;
 import server.Servidor;
 
 import javax.swing.JDialog;
@@ -13,8 +15,6 @@ import javax.swing.JOptionPane;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.Color;
 import java.awt.Font;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -26,25 +26,19 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.function.Supplier;
 
 public class Principal extends JFrame {
 
     private JMenu mnGestion;
+    private JMenu mnUsuarios;
+    private static boolean serverStarted;
     private static Socket sfd;
     private static DataInputStream entradaSocket;
     private static DataOutputStream salidaSocket;
 
     public Principal() {
-        Servidor servidor = new Servidor(7000);
-        servidor.start();
-
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent event) {
-                saveBolsa();
-                saveCodigos();
-            }
-        });
+        startBackupServerOnce();
 
         setTitle("Bolsa Laboral");
         setIconImage(UIUtils.image("icono.png"));
@@ -52,9 +46,17 @@ public class Principal extends JFrame {
         setJMenuBar(createMenuBar());
         setContentPane(new ScaledImagePanel("fondo.png"));
 
-        userUI();
         UIUtils.finishFrame(this, 800, 600);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
+    }
+
+    private static synchronized void startBackupServerOnce() {
+        if (!serverStarted) {
+            Servidor servidor = new Servidor(7000);
+            servidor.setDaemon(true);
+            servidor.start();
+            serverStarted = true;
+        }
     }
 
     private JMenuBar createMenuBar() {
@@ -62,28 +64,75 @@ public class Principal extends JFrame {
         menuBar.setBackground(Color.WHITE);
 
         JMenu centros = menu("Centros de Trabajo", "empresa.png");
-        centros.add(item("  Consultar", "consulta.png", event -> openModal(new ConsultarCentros())));
-        centros.add(item("  Registrar", "registro.png", event -> openModal(new RegistroCentro(null))));
-        menuBar.add(centros);
+        addAuthorized(centros, Permiso.CONSULTAR_CENTROS,
+                item("  Consultar", "consulta.png",
+                        event -> openAuthorized(Permiso.CONSULTAR_CENTROS,
+                                () -> new ConsultarCentros())));
+        addAuthorized(centros, Permiso.GESTIONAR_CENTROS,
+                item("  Registrar", "registro.png",
+                        event -> openAuthorized(Permiso.GESTIONAR_CENTROS,
+                                () -> new RegistroCentro(null))));
+        addIfNotEmpty(menuBar, centros);
 
         JMenu candidatos = menu("Candidatos", "trabajador.png");
-        candidatos.add(item("  Consultar", "consulta.png", event -> openModal(new ConsultarCandidatos())));
-        candidatos.add(item("  Registrar", "registro.png", event -> openModal(new RegistroCandidato(null))));
-        menuBar.add(candidatos);
+        addAuthorized(candidatos, Permiso.CONSULTAR_CANDIDATOS,
+                item("  Consultar", "consulta.png",
+                        event -> openAuthorized(Permiso.CONSULTAR_CANDIDATOS,
+                                () -> new ConsultarCandidatos())));
+        addAuthorized(candidatos, Permiso.GESTIONAR_CANDIDATOS,
+                item("  Registrar", "registro.png",
+                        event -> openAuthorized(Permiso.GESTIONAR_CANDIDATOS,
+                                () -> new RegistroCandidato(null))));
+        addIfNotEmpty(menuBar, candidatos);
 
         JMenu ofertas = menu("Catálogo de Ofertas", "conexion.png");
-        ofertas.add(item("  Consultar", "consulta.png", event -> openModal(new ConsultarOfertas())));
-        ofertas.add(item("  Registrar", "registro.png",
-                event -> openModal(new RegistroOfertaLaboral((logico.OfertaLaboral) null))));
-        ofertas.add(item("  Solicitudes", "solicitud.png", event -> openModal(new ConsultarSolicitudes())));
-        menuBar.add(ofertas);
+        addAuthorized(ofertas, Permiso.CONSULTAR_OFERTAS,
+                item("  Consultar", "consulta.png",
+                        event -> openAuthorized(Permiso.CONSULTAR_OFERTAS,
+                                () -> new ConsultarOfertas())));
+        addAuthorized(ofertas, Permiso.GESTIONAR_OFERTAS,
+                item("  Registrar", "registro.png",
+                        event -> openAuthorized(Permiso.GESTIONAR_OFERTAS,
+                                () -> new RegistroOfertaLaboral((logico.OfertaLaboral) null))));
+        addAuthorized(ofertas, Permiso.CONSULTAR_SOLICITUDES,
+                item("  Solicitudes", "solicitud.png",
+                        event -> openAuthorized(Permiso.CONSULTAR_SOLICITUDES,
+                                () -> new ConsultarSolicitudes())));
+        addIfNotEmpty(menuBar, ofertas);
 
         mnGestion = menu("Gestión de Datos", "gestion.png");
-        mnGestion.add(item("  Procesamiento", "avanzado.png", event -> openModal(new ProcesamientoAvanzado())));
-        mnGestion.add(item("  Crear Respaldo", "respaldo.png", event -> crearRespaldo()));
-        mnGestion.add(item("  Cargar Respaldo", "descargar.png", event -> cargarRespaldo()));
-        mnGestion.add(item("  Informe", "informes.png", event -> openModal(new InformeGeneral())));
-        menuBar.add(mnGestion);
+        addAuthorized(mnGestion, Permiso.USAR_PROCESAMIENTO_AVANZADO,
+                item("  Procesamiento", "avanzado.png",
+                        event -> openAuthorized(Permiso.USAR_PROCESAMIENTO_AVANZADO,
+                                () -> new ProcesamientoAvanzado())));
+        addAuthorized(mnGestion, Permiso.GESTIONAR_RESPALDOS,
+                item("  Crear Respaldo", "respaldo.png",
+                        event -> runAuthorized(Permiso.GESTIONAR_RESPALDOS,
+                                () -> crearRespaldo())));
+        addAuthorized(mnGestion, Permiso.GESTIONAR_RESPALDOS,
+                item("  Cargar Respaldo", "descargar.png",
+                        event -> runAuthorized(Permiso.GESTIONAR_RESPALDOS,
+                                () -> cargarRespaldo())));
+        addAuthorized(mnGestion, Permiso.VER_INFORMES,
+                item("  Informe", "informes.png",
+                        event -> openAuthorized(Permiso.VER_INFORMES,
+                                () -> new InformeGeneral())));
+        addAuthorized(mnGestion, Permiso.GESTIONAR_CATALOGOS,
+                item("  Catálogos", "gestion.png",
+                        event -> openAuthorized(Permiso.GESTIONAR_CATALOGOS,
+                                () -> new GestionCatalogos())));
+        addIfNotEmpty(menuBar, mnGestion);
+
+        mnUsuarios = menu("Gestión de Usuarios", "user.png");
+        addAuthorized(mnUsuarios, Permiso.GESTIONAR_USUARIOS,
+                item("  Consultar usuarios", "consulta.png",
+                        event -> openAuthorized(Permiso.GESTIONAR_USUARIOS,
+                                () -> new ConsultarUsuarios())));
+        addAuthorized(mnUsuarios, Permiso.GESTIONAR_USUARIOS,
+                item("  Registrar usuario", "registro.png",
+                        event -> openAuthorized(Permiso.GESTIONAR_USUARIOS,
+                                () -> new RegistroUsuario(null))));
+        addIfNotEmpty(menuBar, mnUsuarios);
 
         return menuBar;
     }
@@ -109,7 +158,48 @@ public class Principal extends JFrame {
         dialog.setVisible(true);
     }
 
+    private void openAuthorized(Permiso permiso, Supplier<JDialog> dialogFactory) {
+        try {
+            AutorizacionService.exigirPermiso(
+                    BolsaLaboral.getInstancia().getUsuarioActual(), permiso);
+            JDialog dialog = dialogFactory.get();
+            openModal(dialog);
+        } catch (SecurityException exception) {
+            showUnauthorized(exception);
+        }
+    }
+
+    private void runAuthorized(Permiso permiso, Runnable action) {
+        try {
+            AutorizacionService.exigirPermiso(
+                    BolsaLaboral.getInstancia().getUsuarioActual(), permiso);
+            action.run();
+        } catch (SecurityException exception) {
+            showUnauthorized(exception);
+        }
+    }
+
+    private void addAuthorized(JMenu menu, Permiso permiso, JMenuItem item) {
+        if (AutorizacionService.tienePermiso(
+                BolsaLaboral.getInstancia().getUsuarioActual(), permiso)) {
+            menu.add(item);
+        }
+    }
+
+    private void addIfNotEmpty(JMenuBar menuBar, JMenu menu) {
+        if (menu.getItemCount() > 0) {
+            menuBar.add(menu);
+        }
+    }
+
+    private void showUnauthorized(SecurityException exception) {
+        JOptionPane.showMessageDialog(this, exception.getMessage(),
+                "Acción no autorizada", JOptionPane.WARNING_MESSAGE);
+    }
+
     private void crearRespaldo() {
+        AutorizacionService.exigirPermiso(
+                BolsaLaboral.getInstancia().getUsuarioActual(), Permiso.GESTIONAR_RESPALDOS);
         saveBolsa();
         saveCodigos();
         enviarArchivo("bolsa", "bolsa.dat");
@@ -144,12 +234,6 @@ public class Principal extends JFrame {
             output.writeInt(BolsaLaboral.genCodigoVacanteCompletada);
         } catch (IOException exception) {
             exception.printStackTrace();
-        }
-    }
-
-    private void userUI() {
-        if (!BolsaLaboral.getInstancia().getUsuarioActual().getTipo().equals("Admin")) {
-            mnGestion.setEnabled(false);
         }
     }
 
@@ -202,6 +286,8 @@ public class Principal extends JFrame {
     }
 
     private void cargarRespaldo() {
+        AutorizacionService.exigirPermiso(
+                BolsaLaboral.getInstancia().getUsuarioActual(), Permiso.GESTIONAR_RESPALDOS);
         JFileChooser fileChooser = new JFileChooser(new File("."));
         fileChooser.setDialogTitle("Seleccionar archivo de respaldo de la bolsa");
         fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
@@ -223,7 +309,8 @@ public class Principal extends JFrame {
         }
 
         String numero = nombre.replace("bolsa_respaldo_", "").replace(".dat", "");
-        File archivoCodigos = new File("codigos_respaldo_" + numero + ".dat");
+        File archivoCodigos = new File(
+                archivoBolsa.getParentFile(), "codigos_respaldo_" + numero + ".dat");
         if (!archivoCodigos.exists()) {
             JOptionPane.showMessageDialog(this,
                     "No se encontró el archivo de códigos correspondiente: " + archivoCodigos.getName(),

@@ -4,6 +4,10 @@ import exception.FormatException;
 import logico.BolsaLaboral;
 import logico.CentroEmpleador;
 import logico.OfertaLaboral;
+import logico.AutorizacionService;
+import logico.Permiso;
+import logico.TipoCandidato;
+import logico.TipoCatalogo;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
@@ -56,6 +60,8 @@ public class RegistroOfertaLaboral extends JDialog {
     private JSpinner spnSalario;
     private JTextArea txtDescripcion;
     private JSpinner spnVacantes;
+    private JTextField txtVacantesOcupadas;
+    private JTextField txtVacantesDisponibles;
     private JComboBox<String> cmbHabilidad;
     private JCheckBox chckbxIngls;
     private JCheckBox chckbxPortugus;
@@ -92,6 +98,8 @@ public class RegistroOfertaLaboral extends JDialog {
     private JComboBox<String> cmbAreaTecnica;
     private JSpinner spnAniosExp;
     private JSpinner spnPorcentaje;
+    private final ArrayList<CentroEmpleador> centrosSeleccionables =
+            new ArrayList<CentroEmpleador>();
 
     public RegistroOfertaLaboral(JDialog parent, OfertaLaboral oferta) {
         super(parent, true);
@@ -112,7 +120,7 @@ public class RegistroOfertaLaboral extends JDialog {
         contentPanel.add(buildButtonBar(), BorderLayout.SOUTH);
 
         cmbArea.setSelectedIndex(0);
-        cambiarEspecializacion("Estudiante Universitario");
+        cambiarEspecializacion(TipoCandidato.UNIVERSITARIO);
         cargarDatos();
         UIUtils.finishDialog(this, parent, 740, 680);
     }
@@ -140,7 +148,16 @@ public class RegistroOfertaLaboral extends JDialog {
         ArrayList<String> ofertadores = new ArrayList<String>();
         ofertadores.add("<Seleccione un ofertador>");
         for (CentroEmpleador centro : BolsaLaboral.getInstancia().getCentros()) {
-            ofertadores.add(centro.getCodigo() + " : " + centro.getNombre());
+            if (centro != null) {
+                centrosSeleccionables.add(centro);
+                ofertadores.add(centro.getCodigo() + " : " + centro.getNombre());
+            }
+        }
+        if (ofertaAct != null && ofertaAct.getOfertador() != null
+                && indiceCentro(ofertaAct.getOfertador()) < 0) {
+            centrosSeleccionables.add(ofertaAct.getOfertador());
+            ofertadores.add(ofertaAct.getOfertador().getCodigo() + " : "
+                    + ofertaAct.getOfertador().getNombre() + " (legado)");
         }
         cmbOfertador = new JComboBox<String>(ofertadores.toArray(new String[ofertadores.size()]));
         cmbOfertador.setMaximumRowCount(Math.max(1, ofertadores.size()));
@@ -157,16 +174,22 @@ public class RegistroOfertaLaboral extends JDialog {
         descriptionScroll.setPreferredSize(new Dimension(UIUtils.scale(320), UIUtils.scale(110)));
         UIUtils.addFormRow(panel, 5, "Descripción:", descriptionScroll);
 
-        spnVacantes = new JSpinner(new SpinnerNumberModel(1, 1, null, 1));
-        UIUtils.addFormRow(panel, 6, "Vacantes:", spnVacantes);
+        spnVacantes = new JSpinner(new SpinnerNumberModel(1, 0, null, 1));
+        UIUtils.addFormRow(panel, 6, "Vacantes totales:", spnVacantes);
+        txtVacantesOcupadas = textField();
+        txtVacantesOcupadas.setEditable(false);
+        txtVacantesDisponibles = textField();
+        txtVacantesDisponibles.setEditable(false);
+        UIUtils.addFormRow(panel, 7, "Vacantes ocupadas:", txtVacantesOcupadas);
+        UIUtils.addFormRow(panel, 8, "Vacantes disponibles:", txtVacantesDisponibles);
+        spnVacantes.addChangeListener(event -> actualizarResumenVacantes());
 
-        cmbArea = combo(new String[]{"No definido", "Finanzas", "Recursos Humanos", "Marketing",
-                "Limpieza", "Seguridad", "TI", "Salud", "Operaciones", "Administración",
-                "Atención al Cliente", "Educación"});
+        cmbArea = combo(valoresCatalogo(TipoCatalogo.AREAS_LABORALES,
+                ofertaAct == null ? null : ofertaAct.getArea()));
         lblIcoArea = new JLabel();
         cmbArea.addActionListener(event -> cargarArea());
-        UIUtils.addFormRow(panel, 7, "Área:", cmbArea, lblIcoArea);
-        UIUtils.addVerticalFiller(panel, 8);
+        UIUtils.addFormRow(panel, 9, "Área:", cmbArea, lblIcoArea);
+        UIUtils.addVerticalFiller(panel, 10);
         return panel;
     }
 
@@ -174,12 +197,12 @@ public class RegistroOfertaLaboral extends JDialog {
         JPanel panel = UIUtils.formPanel();
         JPanel typePanel = UIUtils.titledPanel("Nivel Académico Requerido");
         typePanel.setLayout(new GridLayout(1, 3, UIUtils.scale(8), 0));
-        rdUniversitario = new JRadioButton("Estudiante Universitario", true);
-        rdTecnico = new JRadioButton("Estudiante Técnico");
+        rdUniversitario = new JRadioButton("Universitario / Profesional", true);
+        rdTecnico = new JRadioButton("Técnico Superior");
         rdObrero = new JRadioButton("Obrero");
-        rdUniversitario.addActionListener(event -> cambiarEspecializacion("Estudiante Universitario"));
-        rdTecnico.addActionListener(event -> cambiarEspecializacion("Estudiante Tecnico"));
-        rdObrero.addActionListener(event -> cambiarEspecializacion("Obrero"));
+        rdUniversitario.addActionListener(event -> cambiarEspecializacion(TipoCandidato.UNIVERSITARIO));
+        rdTecnico.addActionListener(event -> cambiarEspecializacion(TipoCandidato.TECNICO));
+        rdObrero.addActionListener(event -> cambiarEspecializacion(TipoCandidato.OBRERO));
         ButtonGroup group = new ButtonGroup();
         group.add(rdUniversitario);
         group.add(rdTecnico);
@@ -206,21 +229,11 @@ public class RegistroOfertaLaboral extends JDialog {
 
         JPanel languages = UIUtils.titledPanel("Idiomas Requeridos");
         languages.setLayout(new GridLayout(3, 3, UIUtils.scale(8), UIUtils.scale(4)));
-        chckbxIngls = check("Inglés");
-        chckbxPortugus = check("Portugués");
-        chckbxItaliano = check("Italiano");
-        chckbxAlemn = check("Alemán");
-        chckbxMandarn = check("Chino");
-        chckbxCoreano = check("Coreano");
-        chckbxEspaol = check("Español");
-        chckbxFrancs = check("Francés");
-        chckbxJapons = check("Japonés");
-        JCheckBox[] orderedLanguages = {chckbxIngls, chckbxPortugus, chckbxMandarn,
-                chckbxItaliano, chckbxAlemn, chckbxCoreano,
-                chckbxEspaol, chckbxFrancs, chckbxJapons};
-        for (JCheckBox language : orderedLanguages) {
-            languages.add(language);
+        for (String idioma : valoresCatalogoConHistoricos(TipoCatalogo.IDIOMAS,
+                ofertaAct == null ? null : ofertaAct.getIdiomasRequeridas())) {
+            languages.add(check(idioma));
         }
+        checkIdiomas = checksDe(languages);
         GridBagConstraints languageConstraints = UIUtils.constraints(0, 2);
         languageConstraints.gridwidth = GridBagConstraints.REMAINDER;
         languageConstraints.weightx = 1;
@@ -233,41 +246,20 @@ public class RegistroOfertaLaboral extends JDialog {
     private JPanel buildCareersPanel() {
         JPanel panel = UIUtils.titledPanel("Carreras Permitidas");
         panel.setLayout(new GridLayout(0, 3, UIUtils.scale(8), UIUtils.scale(4)));
-        chkARQ = check("Arquitectura");
-        chkICV = check("Ingeniería Civil");
-        chkIEL = check("Ingeniería Eléctrica");
-        chkDER = check("Derecho");
-        chkIST = check("Ingeniería de Sistemas");
-        chkIT = check("Ingeniería Telemática");
-        chkMKT = check("Marketing");
-        chkCTB = check("Contabilidad");
-        chkCOM = check("Comunicación");
-        chkMED = check("Medicina");
-        chkEDU = check("Educación");
-        chkPSI = check("Psicología");
-        chkII = check("Ingeniería Industrial");
-        chkHOT = check("Hotelería");
-        chkNUT = check("Nutrición");
-        chkDE = check("Dirección Empresarial");
-        chkECO = check("Economía");
-        chkIAG = check("Ingeniería Agronómica");
-        JCheckBox[] careers = {chkARQ, chkICV, chkIEL, chkDER, chkIST, chkIT, chkMKT, chkCTB,
-                chkCOM, chkMED, chkEDU, chkPSI, chkII, chkHOT, chkNUT, chkDE, chkECO, chkIAG};
-        for (JCheckBox career : careers) {
-            panel.add(career);
+        Iterable<String> historicas = ofertaAct != null
+                && ofertaAct.getTipoCandidatoRequerido() == TipoCandidato.UNIVERSITARIO
+                ? ofertaAct.getRequisitos() : null;
+        for (String carrera : valoresCatalogoConHistoricos(TipoCatalogo.CARRERAS, historicas)) {
+            panel.add(check(carrera));
         }
+        checkHabilidades = checksDe(panel);
         return panel;
     }
 
     private JPanel buildTechnicalPanel() {
         JPanel panel = UIUtils.titledPanel("Requerimientos Técnicos");
-        cmbAreaTecnica = combo(new String[]{
-                "Gestión de Talento Humano", "Impuestos y Contabilidad", "Publicidad", "Gestión Comercial",
-                "Higiene y Seguridad Industrial", "Mantenimiento de Instalaciones", "Protección Civil",
-                "Protección Industrial", "Redes de Datos", "Desarrollo de Software", "Logística Industrial",
-                "Gestión Empresarial", "Atención Comercial", "Automatización", "Diseño Gráfico",
-                "Ciberseguridad", "Robótica", "Medios Digitales"
-        });
+        cmbAreaTecnica = combo(valoresCatalogo(TipoCatalogo.AREAS_TECNICAS,
+                requisitoHistorico(TipoCandidato.TECNICO)));
         spnAniosExp = new JSpinner(new SpinnerNumberModel(0, 0, 100, 1));
         UIUtils.addFormRow(panel, 0, "Área requerida:", cmbAreaTecnica);
         UIUtils.addFormRow(panel, 1, "Años de experiencia:", spnAniosExp);
@@ -277,10 +269,8 @@ public class RegistroOfertaLaboral extends JDialog {
 
     private JPanel buildWorkerPanel() {
         JPanel panel = UIUtils.titledPanel("Requerimientos del Obrero");
-        cmbHabilidad = combo(new String[]{"Plomería", "Carpintería", "Gestión Financiera",
-                "Instalación Eléctrica", "Soldadura", "Mecánica", "Albañilería", "Redes Sociales",
-                "Conducción", "Reparación de Electrónicos", "Ventas", "Fotografía", "Cocina",
-                "Limpieza", "Pintura"});
+        cmbHabilidad = combo(valoresCatalogo(TipoCatalogo.HABILIDADES,
+                requisitoHistorico(TipoCandidato.OBRERO)));
         UIUtils.addFormRow(panel, 0, "Habilidad requerida:", cmbHabilidad);
         UIUtils.addVerticalFiller(panel, 1);
         return panel;
@@ -355,44 +345,49 @@ public class RegistroOfertaLaboral extends JDialog {
             } else {
                 registrarOferta();
             }
-        } catch (FormatException exception) {
+        } catch (FormatException | IllegalArgumentException | SecurityException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(),
                     "Advertencia", JOptionPane.WARNING_MESSAGE);
         }
     }
 
     private void modificarOferta() {
+        AutorizacionService.exigirPermiso(BolsaLaboral.getInstancia().getUsuarioActual(),
+                Permiso.GESTIONAR_OFERTAS);
+        ofertaAct.setVacantesTotales(((Number) spnVacantes.getValue()).intValue());
         ofertaAct.setPuesto(txtPuesto.getText());
         ofertaAct.setDescripcion(txtDescripcion.getText());
         ofertaAct.setSalario(((Number) spnSalario.getValue()).floatValue());
-        ofertaAct.setVacantes(((Number) spnVacantes.getValue()).intValue());
-        ofertaAct.setOfertador(BolsaLaboral.getInstancia().getCentros().get(cmbOfertador.getSelectedIndex() - 1));
+        ofertaAct.setOfertador(getCentroSeleccionado());
         ofertaAct.setArea(cmbArea.getSelectedItem().toString());
         ofertaAct.setModalidad(cmbModalidad.getSelectedItem().toString());
         ofertaAct.setJornada(cmbJornada.getSelectedItem().toString());
         ofertaAct.setObligatorioMayorDeEdad(chkbxMayor.isSelected());
         ofertaAct.setOfreceReubicacion(chkReubicacion.isSelected());
+        ofertaAct.setobligatorioLicencia(chkLicencia.isSelected());
         ofertaAct.setPorcentajeMinimo(((Number) spnPorcentaje.getValue()).intValue());
 
+        ofertaAct.getIdiomasRequeridas().clear();
+        ofertaAct.clearRequisitos();
         for (JCheckBox idioma : checkIdiomas) {
             if (idioma.isSelected()) {
                 ofertaAct.agregarIdioma(idioma.getText());
             }
         }
         if (rdUniversitario.isSelected()) {
-            ofertaAct.setNivelAcademico(rdUniversitario.getText());
+            ofertaAct.setTipoCandidatoRequerido(TipoCandidato.UNIVERSITARIO);
             for (JCheckBox carrera : checkHabilidades) {
                 if (carrera.isSelected()) {
                     ofertaAct.agregarRequisito(carrera.getText());
                 }
             }
         } else if (rdTecnico.isSelected()) {
-            ofertaAct.setNivelAcademico(rdTecnico.getText());
+            ofertaAct.setTipoCandidatoRequerido(TipoCandidato.TECNICO);
             ofertaAct.setExperienciaMinima(((Number) spnAniosExp.getValue()).intValue());
             ofertaAct.clearRequisitos();
             ofertaAct.agregarRequisito(cmbAreaTecnica.getSelectedItem().toString());
         } else if (rdObrero.isSelected()) {
-            ofertaAct.setNivelAcademico(rdObrero.getText());
+            ofertaAct.setTipoCandidatoRequerido(TipoCandidato.OBRERO);
             ofertaAct.clearRequisitos();
             ofertaAct.agregarRequisito(cmbHabilidad.getSelectedItem().toString());
         }
@@ -410,26 +405,28 @@ public class RegistroOfertaLaboral extends JDialog {
     }
 
     private void registrarOferta() {
+        AutorizacionService.exigirPermiso(BolsaLaboral.getInstancia().getUsuarioActual(),
+                Permiso.GESTIONAR_OFERTAS);
         ArrayList<String> requisitos = new ArrayList<String>();
         ArrayList<String> idiomas = new ArrayList<String>();
-        String nivelAcademico = "";
+        TipoCandidato tipoCandidato = TipoCandidato.UNIVERSITARIO;
         for (JCheckBox idioma : checkIdiomas) {
             if (idioma.isSelected()) {
                 idiomas.add(idioma.getText());
             }
         }
         if (rdUniversitario.isSelected()) {
-            nivelAcademico = rdUniversitario.getText();
+            tipoCandidato = TipoCandidato.UNIVERSITARIO;
             for (JCheckBox carrera : checkHabilidades) {
                 if (carrera.isSelected()) {
                     requisitos.add(carrera.getText());
                 }
             }
         } else if (rdObrero.isSelected()) {
-            nivelAcademico = rdObrero.getText();
+            tipoCandidato = TipoCandidato.OBRERO;
             requisitos.add(cmbHabilidad.getSelectedItem().toString());
         } else if (rdTecnico.isSelected()) {
-            nivelAcademico = rdTecnico.getText();
+            tipoCandidato = TipoCandidato.TECNICO;
             requisitos.add(cmbAreaTecnica.getSelectedItem().toString());
         }
 
@@ -440,9 +437,11 @@ public class RegistroOfertaLaboral extends JDialog {
                 ((Number) spnSalario.getValue()).floatValue(),
                 ((Number) spnAniosExp.getValue()).intValue(),
                 ((Number) spnVacantes.getValue()).intValue(),
-                BolsaLaboral.getInstancia().getCentros().get(cmbOfertador.getSelectedIndex() - 1),
+                getCentroSeleccionado(),
                 chkReubicacion.isSelected(), chkbxMayor.isSelected(), chkLicencia.isSelected(),
-                nivelAcademico, requisitos, idiomas, ((Number) spnPorcentaje.getValue()).intValue());
+                tipoCandidato.getEtiqueta(), requisitos, idiomas,
+                ((Number) spnPorcentaje.getValue()).intValue());
+        nuevaOferta.setTipoCandidatoRequerido(tipoCandidato);
         BolsaLaboral.getInstancia().registrarOfertaLaboral(nuevaOferta);
         JOptionPane.showMessageDialog(this, "La oferta laboral ha sido agregado correctamente.",
                 "Información", JOptionPane.INFORMATION_MESSAGE);
@@ -468,10 +467,10 @@ public class RegistroOfertaLaboral extends JDialog {
         }
     }
 
-    private void cambiarEspecializacion(String especializacion) {
-        if (especializacion.equalsIgnoreCase("Obrero")) {
+    private void cambiarEspecializacion(TipoCandidato especializacion) {
+        if (especializacion == TipoCandidato.OBRERO) {
             specializationLayout.show(specializationCards, CARD_OBRERO);
-        } else if (especializacion.equalsIgnoreCase("Estudiante Tecnico")) {
+        } else if (especializacion == TipoCandidato.TECNICO) {
             specializationLayout.show(specializationCards, CARD_TECNICO);
         } else {
             specializationLayout.show(specializationCards, CARD_UNIVERSITARIO);
@@ -497,49 +496,50 @@ public class RegistroOfertaLaboral extends JDialog {
     }
 
     private void cargarDatos() {
-        checkIdiomas = new JCheckBox[]{chckbxIngls, chckbxPortugus, chckbxItaliano,
-                chckbxAlemn, chckbxMandarn, chckbxCoreano, chckbxEspaol, chckbxFrancs, chckbxJapons};
-        checkHabilidades = new JCheckBox[]{chkARQ, chkICV, chkIEL, chkDER, chkIST, chkIT,
-                chkMKT, chkCTB, chkCOM, chkMED, chkEDU, chkPSI, chkII, chkHOT, chkNUT,
-                chkDE, chkECO, chkIAG};
         if (ofertaAct == null) {
+            actualizarResumenVacantes();
             return;
         }
 
+        ofertaAct.sincronizarVacantesOcupadas(
+                BolsaLaboral.getInstancia().contarVacantesOcupadas(ofertaAct));
         txtCodigo.setText(ofertaAct.getCodigo());
         txtPuesto.setText(ofertaAct.getPuesto());
-        cmbOfertador.setSelectedIndex(
-                BolsaLaboral.getInstancia().buscarIndiceCentroByCodigo(ofertaAct.getOfertador().getCodigo()) + 1);
+        cmbOfertador.setSelectedIndex(indiceCentro(ofertaAct.getOfertador()) + 1);
         spnSalario.setValue(ofertaAct.getSalario());
         txtDescripcion.setText(ofertaAct.getDescripcion());
-        spnVacantes.setValue(ofertaAct.getVacantes());
+        spnVacantes.setValue(ofertaAct.getVacantesTotales());
+        actualizarResumenVacantes();
         spnPorcentaje.setValue(ofertaAct.getPorcentajeMinimo());
         cmbArea.setSelectedItem(ofertaAct.getArea());
         cmbModalidad.setSelectedItem(ofertaAct.getModalidad());
         cmbJornada.setSelectedItem(ofertaAct.getJornada());
-        cmbAreaTecnica.setSelectedItem(ofertaAct.getArea());
+        if (!ofertaAct.getRequisitos().isEmpty()) {
+            cmbAreaTecnica.setSelectedItem(ofertaAct.getRequisitos().get(0));
+        }
         spnAniosExp.setValue(ofertaAct.getExperienciaMinima());
         chkbxMayor.setSelected(ofertaAct.isObligatorioMayorDeEdad());
         chkReubicacion.setSelected(ofertaAct.isOfreceReubicacion());
+        chkLicencia.setSelected(ofertaAct.isobligatorioLicencia());
 
         for (JCheckBox idioma : checkIdiomas) {
             idioma.setSelected(ofertaAct.getIdiomasRequeridas().contains(idioma.getText()));
         }
-        if (ofertaAct.getNivelAcademico().equals(rdUniversitario.getText())) {
+        if (ofertaAct.getTipoCandidatoRequerido() == TipoCandidato.UNIVERSITARIO) {
             rdUniversitario.setSelected(true);
-            cambiarEspecializacion("Estudiante Universitario");
+            cambiarEspecializacion(TipoCandidato.UNIVERSITARIO);
             for (JCheckBox carrera : checkHabilidades) {
                 carrera.setSelected(ofertaAct.getRequisitos().contains(carrera.getText()));
             }
-        } else if (ofertaAct.getNivelAcademico().equals(rdObrero.getText())) {
+        } else if (ofertaAct.getTipoCandidatoRequerido() == TipoCandidato.OBRERO) {
             rdObrero.setSelected(true);
-            cambiarEspecializacion("Obrero");
+            cambiarEspecializacion(TipoCandidato.OBRERO);
             if (!ofertaAct.getRequisitos().isEmpty()) {
                 cmbHabilidad.setSelectedItem(ofertaAct.getRequisitos().get(0));
             }
-        } else if (ofertaAct.getNivelAcademico().equals(rdTecnico.getText())) {
+        } else if (ofertaAct.getTipoCandidatoRequerido() == TipoCandidato.TECNICO) {
             rdTecnico.setSelected(true);
-            cambiarEspecializacion("Estudiante Tecnico");
+            cambiarEspecializacion(TipoCandidato.TECNICO);
             if (!ofertaAct.getRequisitos().isEmpty()) {
                 cmbAreaTecnica.setSelectedItem(ofertaAct.getRequisitos().get(0));
             }
@@ -568,11 +568,12 @@ public class RegistroOfertaLaboral extends JDialog {
             carrera.setSelected(false);
         }
         rdUniversitario.setSelected(true);
-        cambiarEspecializacion("Estudiante Universitario");
+        cambiarEspecializacion(TipoCandidato.UNIVERSITARIO);
+        actualizarResumenVacantes();
     }
 
     private boolean verificar() throws FormatException {
-        if (cmbOfertador.getSelectedIndex() == 0) {
+        if (getCentroSeleccionado() == null) {
             throw new FormatException("Debe seleccionar un centro empleador válido.");
         }
         if (txtPuesto.getText().trim().isEmpty()) {
@@ -587,9 +588,92 @@ public class RegistroOfertaLaboral extends JDialog {
         if (rdUniversitario.isSelected() && !carreraSeleccionada()) {
             throw new FormatException("Debe seleccionar por lo menos una carrera permitida.");
         }
-        if (cmbArea.getSelectedIndex() == 0) {
-            throw new FormatException("Debe seleccionar un area.");
+        if (cmbArea.getSelectedItem() == null) {
+            throw new FormatException("Debe seleccionar un área.");
+        }
+        int total = ((Number) spnVacantes.getValue()).intValue();
+        int ocupadas = ofertaAct == null ? 0
+                : BolsaLaboral.getInstancia().contarVacantesOcupadas(ofertaAct);
+        if (total < ocupadas) {
+            throw new FormatException(
+                    "Las vacantes totales no pueden ser menores que las ocupadas (" + ocupadas + ").");
         }
         return true;
+    }
+
+    private CentroEmpleador getCentroSeleccionado() {
+        int indice = cmbOfertador.getSelectedIndex() - 1;
+        return indice >= 0 && indice < centrosSeleccionables.size()
+                ? centrosSeleccionables.get(indice) : null;
+    }
+
+    private int indiceCentro(CentroEmpleador buscado) {
+        if (buscado == null) {
+            return -1;
+        }
+        for (int indice = 0; indice < centrosSeleccionables.size(); indice++) {
+            CentroEmpleador centro = centrosSeleccionables.get(indice);
+            if (centro == buscado || java.util.Objects.equals(
+                    centro.getCodigo(), buscado.getCodigo())) {
+                return indice;
+            }
+        }
+        return -1;
+    }
+
+    private void actualizarResumenVacantes() {
+        if (txtVacantesOcupadas == null || txtVacantesDisponibles == null) {
+            return;
+        }
+        int ocupadas = ofertaAct == null ? 0
+                : BolsaLaboral.getInstancia().contarVacantesOcupadas(ofertaAct);
+        int total = ((Number) spnVacantes.getValue()).intValue();
+        txtVacantesOcupadas.setText(String.valueOf(ocupadas));
+        txtVacantesDisponibles.setText(String.valueOf(Math.max(0, total - ocupadas)));
+    }
+
+    private String[] valoresCatalogo(TipoCatalogo tipo, String historico) {
+        return BolsaLaboral.getInstancia().getCatalogos()
+                .getValoresParaEdicion(tipo, historico).toArray(new String[0]);
+    }
+
+    private java.util.List<String> valoresCatalogoConHistoricos(
+            TipoCatalogo tipo, Iterable<String> historicos) {
+        ArrayList<String> valores = new ArrayList<String>(
+                BolsaLaboral.getInstancia().getCatalogos().getValoresActivos(tipo));
+        if (historicos != null) {
+            for (String historico : historicos) {
+                boolean existe = false;
+                for (String valor : valores) {
+                    if (logico.TextoNormalizer.normalizar(valor).equals(
+                            logico.TextoNormalizer.normalizar(historico))) {
+                        existe = true;
+                        break;
+                    }
+                }
+                if (!existe && historico != null && !historico.trim().isEmpty()) {
+                    valores.add(historico);
+                }
+            }
+        }
+        return valores;
+    }
+
+    private String requisitoHistorico(TipoCandidato tipo) {
+        if (ofertaAct != null && ofertaAct.getTipoCandidatoRequerido() == tipo
+                && !ofertaAct.getRequisitos().isEmpty()) {
+            return ofertaAct.getRequisitos().get(0);
+        }
+        return null;
+    }
+
+    private JCheckBox[] checksDe(JPanel panel) {
+        ArrayList<JCheckBox> checks = new ArrayList<JCheckBox>();
+        for (Component component : panel.getComponents()) {
+            if (component instanceof JCheckBox) {
+                checks.add((JCheckBox) component);
+            }
+        }
+        return checks.toArray(new JCheckBox[0]);
     }
 }

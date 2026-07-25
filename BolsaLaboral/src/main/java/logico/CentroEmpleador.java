@@ -30,6 +30,14 @@ public class CentroEmpleador implements Serializable{
 		this.ofertasLaborales = new ArrayList<>();
 	}
 
+	public int migrarDatosDeserializados() {
+		if (ofertasLaborales == null) {
+			ofertasLaborales = new ArrayList<OfertaLaboral>();
+			return 1;
+		}
+		return 0;
+	}
+
 	public String getCodigo() {
 		return codigo;
 	}

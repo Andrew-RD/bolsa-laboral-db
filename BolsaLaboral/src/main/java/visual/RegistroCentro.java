@@ -3,8 +3,10 @@ package visual;
 import exception.FormatException;
 import logico.BolsaLaboral;
 import logico.CentroEmpleador;
+import logico.TipoCatalogo;
+import logico.ResultadoDocumento;
+import logico.RncValidator;
 
-import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
@@ -16,6 +18,7 @@ import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.GridBagConstraints;
+import java.util.Objects;
 
 public class RegistroCentro extends JDialog {
 
@@ -24,8 +27,9 @@ public class RegistroCentro extends JDialog {
     private JTextField txtNombre;
     private JTextField txtTelefono;
     private JTextField txtCorreo;
-    private JTextField txtProvincia;
-    private JTextField txtMunicipio;
+    private JComboBox<String> cmbProvincia;
+    private JComboBox<String> cmbMunicipio;
+    private UbicacionComboSupport ubicacion;
     private JComboBox<String> cmbSector;
     private JLabel lblIcono;
     private JTextField txtRNC;
@@ -56,10 +60,8 @@ public class RegistroCentro extends JDialog {
         txtNombre = textField();
         UIUtils.addFormRow(form, 2, "Nombre:", txtNombre);
 
-        cmbSector = new JComboBox<String>(new DefaultComboBoxModel<String>(new String[]{
-                "No definido", "Turismo", "Tecnología", "Salud", "Comercio", "Educación",
-                "Agricultura", "Construcción", "Jurídico", "Arte", "Transporte"
-        }));
+        cmbSector = new JComboBox<String>(valoresCatalogo(TipoCatalogo.SECTORES_EMPRESARIALES,
+                centro == null ? null : centro.getSector()));
         cmbSector.setMaximumRowCount(11);
         cmbSector.addActionListener(event -> cargarSector());
         lblIcono = new JLabel();
@@ -71,12 +73,13 @@ public class RegistroCentro extends JDialog {
         JPanel contacts = UIUtils.titledPanel("Contactos y Ubicación");
         txtTelefono = textField();
         txtCorreo = textField();
-        txtProvincia = textField();
-        txtMunicipio = textField();
+        ubicacion = new UbicacionComboSupport();
+        cmbProvincia = ubicacion.getProvinciaCombo();
+        cmbMunicipio = ubicacion.getMunicipioCombo();
         UIUtils.addFormRow(contacts, 0, "Teléfono:", txtTelefono);
         UIUtils.addFormRow(contacts, 1, "Correo:", txtCorreo);
-        UIUtils.addFormRow(contacts, 2, "Provincia:", txtProvincia);
-        UIUtils.addFormRow(contacts, 3, "Municipio:", txtMunicipio);
+        UIUtils.addFormRow(contacts, 2, "Provincia:", cmbProvincia);
+        UIUtils.addFormRow(contacts, 3, "Municipio:", cmbMunicipio);
         GridBagConstraints contactsConstraints = UIUtils.constraints(0, 5);
         contactsConstraints.gridwidth = GridBagConstraints.REMAINDER;
         contactsConstraints.weightx = 1;
@@ -120,11 +123,14 @@ public class RegistroCentro extends JDialog {
                 return;
             }
             if (centroAct != null) {
+                String rnc = BolsaLaboral.getInstancia().prepararRnc(
+                        centroAct, txtRNC.getText().trim());
+                advertirLegadosSiCorresponde(rnc);
                 centroAct.setCorreo(txtCorreo.getText());
-                centroAct.setMunicipio(txtMunicipio.getText());
+                centroAct.setMunicipio(ubicacion.getMunicipio());
                 centroAct.setNombre(txtNombre.getText());
-                centroAct.setProvincia(txtProvincia.getText());
-                centroAct.setRnc(txtRNC.getText());
+                centroAct.setProvincia(ubicacion.getProvincia());
+                centroAct.setRnc(rnc);
                 centroAct.setSector(cmbSector.getSelectedItem().toString());
                 centroAct.setTelefono(txtTelefono.getText());
                 if (BolsaLaboral.getInstancia().modificarCentroTrabajo(centroAct)) {
@@ -138,10 +144,12 @@ public class RegistroCentro extends JDialog {
                             "El centro " + txtNombre.getText() + " no logró ser modificado.");
                 }
             } else {
+                String rnc = BolsaLaboral.getInstancia().prepararRnc(
+                        null, txtRNC.getText().trim());
                 CentroEmpleador nuevoCentro = new CentroEmpleador(
                         txtCodigo.getText(), txtNombre.getText(), cmbSector.getSelectedItem().toString(),
-                        txtProvincia.getText(), txtMunicipio.getText(), txtTelefono.getText(),
-                        txtCorreo.getText(), txtRNC.getText());
+                        ubicacion.getProvincia(), ubicacion.getMunicipio(), txtTelefono.getText(),
+                        txtCorreo.getText(), rnc);
                 BolsaLaboral.getInstancia().registrarCentroTrabajo(nuevoCentro);
                 JOptionPane.showMessageDialog(this,
                         "El centro de trabajo ha sido agregado correctamente.",
@@ -149,7 +157,7 @@ public class RegistroCentro extends JDialog {
                 txtCodigo.setText("CEN-" + BolsaLaboral.genCodigoCentro);
                 limpiar();
             }
-        } catch (FormatException exception) {
+        } catch (FormatException | IllegalArgumentException | SecurityException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(),
                     "Advertencia", JOptionPane.WARNING_MESSAGE);
         }
@@ -160,8 +168,10 @@ public class RegistroCentro extends JDialog {
             throw new FormatException("El nombre no puede estar vacío.");
         } else if (txtRNC.getText().isEmpty()) {
             throw new FormatException("El RNC no puede estar vacío.");
-        } else if (txtRNC.getText().length() != 9 || !txtRNC.getText().matches("\\d+")) {
-            throw new FormatException("El RNC debe tener 9 dígitos.");
+        } else if (!RncValidator.validar(txtRNC.getText()).esValido()
+                && !(centroAct != null
+                && Objects.equals(centroAct.getRnc(), txtRNC.getText()))) {
+            throw new FormatException(RncValidator.validar(txtRNC.getText()).getMensaje());
         } else if (txtTelefono.getText().isEmpty()) {
             throw new FormatException("El teléfono no puede estar vacío.");
         } else if (!txtTelefono.getText().matches("\\d{10}")) {
@@ -170,19 +180,20 @@ public class RegistroCentro extends JDialog {
             throw new FormatException("El correo no puede estar vacío.");
         } else if (!txtCorreo.getText().contains("@") || !txtCorreo.getText().contains(".")) {
             throw new FormatException("Formato del correo inválido. Ejemplo: usuario@dominio.com");
-        } else if (txtProvincia.getText().isEmpty()) {
-            throw new FormatException("La provincia no puede estar vacía.");
-        } else if (txtMunicipio.getText().isEmpty()) {
-            throw new FormatException("El municipio no puede estar vacío.");
+        }
+        try {
+            ubicacion.validar();
+            BolsaLaboral.getInstancia().prepararRnc(centroAct, txtRNC.getText().trim());
+        } catch (IllegalArgumentException exception) {
+            throw new FormatException(exception.getMessage());
         }
         return true;
     }
 
     private void limpiar() {
         txtCorreo.setText("");
-        txtMunicipio.setText("");
+        ubicacion.limpiar();
         txtNombre.setText("");
-        txtProvincia.setText("");
         txtRNC.setText("");
         txtTelefono.setText("");
         cmbSector.setSelectedIndex(0);
@@ -194,9 +205,8 @@ public class RegistroCentro extends JDialog {
             cmbSector.setSelectedItem(centroAct.getSector());
             txtCodigo.setText(centroAct.getCodigo());
             txtCorreo.setText(centroAct.getCorreo());
-            txtMunicipio.setText(centroAct.getMunicipio());
             txtNombre.setText(centroAct.getNombre());
-            txtProvincia.setText(centroAct.getProvincia());
+            ubicacion.seleccionar(centroAct.getProvincia(), centroAct.getMunicipio());
             txtRNC.setText(centroAct.getRnc());
             txtTelefono.setText(centroAct.getTelefono());
         }
@@ -205,6 +215,21 @@ public class RegistroCentro extends JDialog {
     private void cargarSector() {
         if (cmbSector.getSelectedItem() != null) {
             lblIcono.setIcon(UIUtils.valueIcon(cmbSector.getSelectedItem().toString()));
+        }
+    }
+
+    private String[] valoresCatalogo(TipoCatalogo tipo, String historico) {
+        return BolsaLaboral.getInstancia().getCatalogos()
+                .getValoresParaEdicion(tipo, historico).toArray(new String[0]);
+    }
+
+    private void advertirLegadosSiCorresponde(String rncPreparado) {
+        ResultadoDocumento validacion = RncValidator.validar(rncPreparado);
+        if (!validacion.esValido() || ubicacion.esLegada()) {
+            JOptionPane.showMessageDialog(this,
+                    "Se conservará un valor legado fuera del catálogo o con RNC inválido "
+                            + "porque no fue modificado.",
+                    "Advertencia de compatibilidad", JOptionPane.WARNING_MESSAGE);
         }
     }
 }

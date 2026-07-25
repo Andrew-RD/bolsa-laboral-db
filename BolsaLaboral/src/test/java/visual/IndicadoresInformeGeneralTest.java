@@ -2,6 +2,7 @@ package visual;
 
 import logico.BolsaLaboral;
 import logico.OfertaLaboral;
+import logico.Solicitud;
 import logico.VacanteCompletada;
 import org.junit.After;
 import org.junit.Before;
@@ -45,15 +46,17 @@ public class IndicadoresInformeGeneralTest {
 
     @Test
     public void cincoContratadosDeDiezPuestosEsCincuentaPorCiento() {
-        agregarOfertaConVacantes(5);
-        agregarContrataciones(5);
+        OfertaLaboral oferta = agregarOfertaConVacantes(10);
+        agregarContrataciones(oferta, 5);
 
         assertEquals(50, bolsa.calcularTasaCovertura());
+        assertEquals(5, bolsa.contarVacantesOcupadasTotales());
     }
 
     @Test
     public void diezContratadosDeDiezPuestosEsCienPorCiento() {
-        agregarContrataciones(10);
+        OfertaLaboral oferta = agregarOfertaConVacantes(10);
+        agregarContrataciones(oferta, 10);
 
         assertEquals(100, bolsa.calcularTasaCovertura());
     }
@@ -73,7 +76,7 @@ public class IndicadoresInformeGeneralTest {
         assertEquals(0, InformeGeneral.calcularTasaExito(-1, 2));
         assertEquals(100, InformeGeneral.calcularTasaExito(5, 2));
 
-        agregarContrataciones(3);
+        agregarContrataciones(null, 3);
         int cobertura = bolsa.calcularTasaCovertura();
         assertTrue(cobertura >= 0 && cobertura <= 100);
     }
@@ -94,15 +97,20 @@ public class IndicadoresInformeGeneralTest {
         assertEquals(0, bolsa.calcularTasaCovertura());
     }
 
-    private void agregarContrataciones(int cantidad) {
+    private void agregarContrataciones(OfertaLaboral oferta, int cantidad) {
         for (int i = 0; i < cantidad; i++) {
-            bolsa.getVacantes().add(new VacanteCompletada("VAC-" + i, null, null, LocalDate.now()));
+            Solicitud solicitud = oferta == null ? null : new Solicitud("SOL-" + i,
+                    LocalDate.now(), Solicitud.ESTADO_APROBADA, null, oferta);
+            bolsa.getVacantes().add(new VacanteCompletada(
+                    "VAC-" + i, solicitud, oferta, LocalDate.now()));
         }
     }
 
-    private void agregarOfertaConVacantes(int vacantes) {
-        bolsa.getOfertas().add(new OfertaLaboral("OFR-" + bolsa.getOfertas().size(), "Puesto", "Descripción",
+    private OfertaLaboral agregarOfertaConVacantes(int vacantes) {
+        OfertaLaboral oferta = new OfertaLaboral("OFR-" + bolsa.getOfertas().size(), "Puesto", "Descripción",
                 "TI", "Presencial", "Tiempo Completo", OfertaLaboral.ESTADO_ACTIVA, 1.0f, 0, vacantes,
-                null, false, false, false, "Obrero", new ArrayList<String>(), new ArrayList<String>(), 0));
+                null, false, false, false, "Obrero", new ArrayList<String>(), new ArrayList<String>(), 0);
+        bolsa.getOfertas().add(oferta);
+        return oferta;
     }
 }
