@@ -1,5 +1,6 @@
 package visual;
 
+import Datos.UsuarioDAO;
 import exception.AuthException;
 import logico.BolsaLaboral;
 import logico.Usuario;
@@ -22,14 +23,6 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.Arrays;
 
 public class Login extends JFrame {
@@ -43,8 +36,6 @@ public class Login extends JFrame {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                bolsaIO();
-                codigoIO();
                 try {
                     new Login().setVisible(true);
                 } catch (RuntimeException exception) {
@@ -163,6 +154,20 @@ public class Login extends JFrame {
 
         getRootPane().setDefaultButton(btnIniciarSesion);
         UIUtils.finishFrame(this, 700, 500);
+
+        cargarUsuarios();
+    }
+
+
+    private void cargarUsuarios() {
+        try {
+            BolsaLaboral.getInstancia().setUsuarios(new UsuarioDAO().listarTodos());
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                    "No fue posible conectar con la base de datos:\n" + exception.getMessage(),
+                    "Error de conexión", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private JLabel fieldLabel(String text) {
@@ -185,60 +190,6 @@ public class Login extends JFrame {
         }
     }
 
-    private static void bolsaIO() {
-        FileInputStream bolsaInput;
-        FileOutputStream bolsaOut;
-        ObjectInputStream bolsaRead;
-        ObjectOutputStream bolsaWrite;
-        try {
-            bolsaInput = new FileInputStream("bolsa.dat");
-            bolsaRead = new ObjectInputStream(bolsaInput);
-            BolsaLaboral temp = (BolsaLaboral) bolsaRead.readObject();
-            temp.migrarDatosDeserializados();
-            BolsaLaboral.setInstancia(temp);
-            bolsaInput.close();
-            bolsaRead.close();
-        } catch (FileNotFoundException exception) {
-            try {
-                bolsaOut = new FileOutputStream("bolsa.dat");
-                bolsaWrite = new ObjectOutputStream(bolsaOut);
-                Usuario admin = new Usuario("Admin", "Admin", "Admin");
-                Usuario empleado = new Usuario("Empleado", "Empleado", "Empleado");
-                BolsaLaboral.getInstancia().regUsuario(admin);
-                BolsaLaboral.getInstancia().regUsuario(empleado);
-                bolsaWrite.writeObject(BolsaLaboral.getInstancia());
-                bolsaOut.close();
-                bolsaWrite.close();
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
-            }
-        } catch (IOException exception) {
-            exception.printStackTrace();
-        } catch (ClassNotFoundException exception) {
-            exception.printStackTrace();
-        }
-    }
-
-    private static void codigoIO() {
-        try (DataInputStream codigoRead = new DataInputStream(new FileInputStream("codigos.dat"))) {
-            BolsaLaboral.genCodigoCandidato = codigoRead.readInt();
-            BolsaLaboral.genCodigoSolicitud = codigoRead.readInt();
-            BolsaLaboral.genCodigoOferta = codigoRead.readInt();
-            BolsaLaboral.genCodigoCentro = codigoRead.readInt();
-            BolsaLaboral.genCodigoVacanteCompletada = codigoRead.readInt();
-        } catch (IOException exception) {
-            try (DataOutputStream codigoWrite = new DataOutputStream(new FileOutputStream("codigos.dat"))) {
-                codigoWrite.writeInt(BolsaLaboral.genCodigoCandidato);
-                codigoWrite.writeInt(BolsaLaboral.genCodigoSolicitud);
-                codigoWrite.writeInt(BolsaLaboral.genCodigoOferta);
-                codigoWrite.writeInt(BolsaLaboral.genCodigoCentro);
-                codigoWrite.writeInt(BolsaLaboral.genCodigoVacanteCompletada);
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
-            }
-        }
-    }
-
     private Usuario verificar() throws AuthException {
         Usuario encontrado = null;
         char[] clave = txtContrasena.getPassword();
@@ -246,7 +197,7 @@ public class Login extends JFrame {
             for (Usuario user : BolsaLaboral.getInstancia().getUsuarios()) {
                 if (user != null && user.getNombreUsuario() != null
                         && user.getNombreUsuario().trim().equalsIgnoreCase(
-                                txtUsuario.getText().trim())
+                        txtUsuario.getText().trim())
                         && user.autenticar(clave)) {
                     encontrado = user;
                     break;

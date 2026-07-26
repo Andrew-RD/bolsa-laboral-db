@@ -17,7 +17,6 @@ public enum Permiso implements Serializable {
     PROCESAR_SOLICITUDES("Procesar solicitudes"),
     USAR_PROCESAMIENTO_AVANZADO("Usar procesamiento avanzado"),
     VER_INFORMES("Ver informes administrativos"),
-    GESTIONAR_RESPALDOS("Gestionar respaldos"),
     GESTIONAR_CATALOGOS("Gestionar catálogos"),
     GESTIONAR_USUARIOS("Gestionar usuarios");
 
