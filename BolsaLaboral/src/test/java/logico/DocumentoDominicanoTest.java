@@ -53,24 +53,47 @@ public class DocumentoDominicanoTest {
     }
 
     @Test
-    public void rncGeneradoEsValidoConYSinFormato() {
-        String rnc = generarRnc("10101010");
-        assertEquals("101010101", rnc);
-        assertTrue(RncValidator.esValido(rnc));
-        assertTrue(RncValidator.esValido("1-01-01010-1"));
-        assertEquals("100000022", generarRnc("10000002"));
-        assertTrue(RncValidator.esValido("100000022"));
-        assertEquals("100000081", generarRnc("10000008"));
-        assertTrue(RncValidator.esValido("100000081"));
+    public void rncAceptaNueveDigitosSinValidarDigitoVerificador() {
+        ResultadoDocumento resultado = RncValidator.validar("101010102");
+
+        assertTrue(resultado.esValido());
+        assertEquals(ResultadoDocumento.Estado.VALIDO, resultado.getEstado());
+        assertEquals("101010102", resultado.getNormalizado());
+        assertEquals("Formato de RNC correcto.", resultado.getMensaje());
     }
 
     @Test
-    public void rncRechazaDigitoFormatoYSecuencia() {
-        assertFalse(RncValidator.esValido("101010102"));
+    public void rncAceptaGuionesYEspaciosYLosNormaliza() {
+        assertTrue(RncValidator.esValido("1-01-01010-2"));
+        assertEquals("101010102", RncValidator.normalizar("1-01-01010-2"));
+
+        assertTrue(RncValidator.esValido(" 1 01 01010 2 "));
+        assertEquals("101010102", RncValidator.normalizar(" 1 01 01010 2 "));
+    }
+
+    @Test
+    public void rncRechazaLongitudesDistintasDeNueveDigitos() {
+        assertEquals(ResultadoDocumento.Estado.LONGITUD_INVALIDA,
+                RncValidator.validar("12345678").getEstado());
+        assertEquals(ResultadoDocumento.Estado.LONGITUD_INVALIDA,
+                RncValidator.validar("1234567890").getEstado());
+    }
+
+    @Test
+    public void rncRechazaLetrasSimbolosYDigitosNoAscii() {
         assertEquals(ResultadoDocumento.Estado.FORMATO_INVALIDO,
                 RncValidator.validar("101A10101").getEstado());
-        assertEquals(ResultadoDocumento.Estado.SECUENCIA_INVALIDA,
-                RncValidator.validar("999999999").getEstado());
+        assertEquals(ResultadoDocumento.Estado.FORMATO_INVALIDO,
+                RncValidator.validar("101.010101").getEstado());
+        assertEquals(ResultadoDocumento.Estado.FORMATO_INVALIDO,
+                RncValidator.validar("١٢٣٤٥٦٧٨٩").getEstado());
+    }
+
+    @Test
+    public void rncRechazaNull() {
+        assertFalse(RncValidator.esValido(null));
+        assertEquals(ResultadoDocumento.Estado.FORMATO_INVALIDO,
+                RncValidator.validar(null).getEstado());
     }
 
     static String generarCedula(String baseDiezDigitos) {
