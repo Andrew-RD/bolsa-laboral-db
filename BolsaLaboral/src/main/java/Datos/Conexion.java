@@ -6,16 +6,15 @@ import java.sql.SQLException;
 
 public class Conexion {
 
-    private static final String URL =
-            "jdbc:sqlserver://localhost:1433"
-                    + ";databaseName=BolsaLaboral"
-                    + ";encrypt=true"
-                    + ";trustServerCertificate=true";
+    private static final String SERVIDOR = "localhost";
+    private static final String BASE_DATOS = "BolsaLaboral";
+
+    private static final String URL = "jdbc:sqlserver://" + SERVIDOR
+            + ";databaseName=" + BASE_DATOS
+            + ";integratedSecurity=true"
+            + ";encrypt=true;trustServerCertificate=true";
 
     public static Connection obtenerConexion() throws SQLException {
-        String usuario = System.getenv("DB_USER");
-        String contrasena = System.getenv("DB_PASSWORD");
-
-        return DriverManager.getConnection(URL, usuario, contrasena);
+        return DriverManager.getConnection(URL);
     }
 }

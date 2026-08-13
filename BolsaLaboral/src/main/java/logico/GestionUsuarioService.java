@@ -1,5 +1,7 @@
 package logico;
 
+import Datos.UsuarioDAO;
+
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -12,29 +14,39 @@ public final class GestionUsuarioService {
             "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
     private final BolsaLaboral bolsa;
+    private final UsuarioDAO usuarioDAO;
 
     public GestionUsuarioService(BolsaLaboral bolsa) {
+        this(bolsa, new UsuarioDAO());
+    }
+    
+    public GestionUsuarioService(BolsaLaboral bolsa, UsuarioDAO usuarioDAO) {
         if (bolsa == null) {
             throw new IllegalArgumentException("La bolsa laboral es obligatoria.");
         }
+        if (usuarioDAO == null) {
+            throw new IllegalArgumentException("El DAO de usuarios es obligatorio.");
+        }
         this.bolsa = bolsa;
+        this.usuarioDAO = usuarioDAO;
     }
 
     public Usuario registrar(String nombreCompleto, String nombreUsuario, String correo,
-            char[] password, char[] confirmacion, RolUsuario rol, boolean activo,
-            Iterable<Permiso> permisos) {
+                             char[] password, char[] confirmacion, RolUsuario rol, boolean activo,
+                             Iterable<Permiso> permisos) {
         exigirGestionUsuarios();
         validarDatos(nombreCompleto, nombreUsuario, correo, rol, null);
         validarContrasenas(password, confirmacion, true);
 
         Usuario usuario = new Usuario(nombreCompleto, nombreUsuario, correo, rol, activo, password);
         usuario.setPermisos(permisos == null ? PermisosPorRol.predeterminados(rol) : permisos);
+        usuarioDAO.agregar(usuario);
         bolsa.getUsuarios().add(usuario);
         return usuario;
     }
 
     public void modificar(Usuario usuario, String nombreCompleto, String nombreUsuario,
-            String correo, RolUsuario rol, boolean activo, Iterable<Permiso> permisos) {
+                          String correo, RolUsuario rol, boolean activo, Iterable<Permiso> permisos) {
         exigirGestionUsuarios();
         exigirUsuarioExistente(usuario);
         validarDatos(nombreCompleto, nombreUsuario, correo, rol, usuario);
@@ -56,6 +68,12 @@ public final class GestionUsuarioService {
             throw new IllegalArgumentException(
                     "No se puede desactivar o degradar al último administrador activo.");
         }
+        String nombreCompletoAnterior = usuario.getNombreCompleto();
+        String nombreUsuarioAnterior = usuario.getNombreUsuario();
+        String correoAnterior = usuario.getCorreo();
+        RolUsuario rolAnterior = usuario.getRol();
+        boolean activoAnterior = usuario.isActivo();
+        EnumSet<Permiso> permisosAnteriores = EnumSet.copyOf(usuario.getPermisos());
 
         usuario.setNombreCompleto(nombreCompleto);
         usuario.setNombreUsuario(nombreUsuario);
@@ -63,6 +81,18 @@ public final class GestionUsuarioService {
         usuario.setRol(rol);
         usuario.setActivo(activo);
         usuario.setPermisos(permisosFinales);
+
+        try {
+            usuarioDAO.modificar(usuario);
+        } catch (RuntimeException e) {
+            usuario.setNombreCompleto(nombreCompletoAnterior);
+            usuario.setNombreUsuario(nombreUsuarioAnterior);
+            usuario.setCorreo(correoAnterior);
+            usuario.setRol(rolAnterior);
+            usuario.setActivo(activoAnterior);
+            usuario.setPermisos(permisosAnteriores);
+            throw e;
+        }
     }
 
     public void cambiarEstado(Usuario usuario, boolean activo) {
@@ -74,7 +104,16 @@ public final class GestionUsuarioService {
         exigirGestionUsuarios();
         exigirUsuarioExistente(usuario);
         validarContrasenas(password, confirmacion, true);
+
+        String contrasenaAnterior = usuario.getContrasena();
         usuario.establecerContrasena(password);
+
+        try {
+            usuarioDAO.modificar(usuario);
+        } catch (RuntimeException e) {
+            usuario.setContrasena(contrasenaAnterior);
+            throw e;
+        }
     }
 
     public void validarContrasenas(char[] password, char[] confirmacion, boolean obligatoria) {
@@ -113,7 +152,7 @@ public final class GestionUsuarioService {
     }
 
     private void validarDatos(String nombreCompleto, String nombreUsuario, String correo,
-            RolUsuario rol, Usuario excluir) {
+                              RolUsuario rol, Usuario excluir) {
         if (vacio(nombreCompleto)) {
             throw new IllegalArgumentException("El nombre completo es obligatorio.");
         }

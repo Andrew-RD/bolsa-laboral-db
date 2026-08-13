@@ -8,45 +8,29 @@ import java.util.EnumSet;
 import java.util.Locale;
 import java.util.UUID;
 
-/**
- * Usuario compatible con la primera versión serializada. Los campos
- * {@code contrasena} y {@code tipo} se conservan exclusivamente para leer
- * objetos legados.
- */
 public class Usuario implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    // Campos históricos: no renombrar ni cambiar su tipo.
     private String nombreUsuario;
     private String contrasena;
     private String tipo;
+    private int idUsuario;
 
-    private String identificador;
     private String nombreCompleto;
     private String correo;
     private RolUsuario rol;
     private Boolean activo;
     private EnumSet<Permiso> permisos;
     private LocalDate fechaCreacion;
-    private byte[] passwordSalt;
-    private byte[] passwordHash;
-    private int passwordIteraciones;
-    private String passwordAlgoritmo;
 
-    /**
-     * Firma histórica. Los objetos creados ahora protegen inmediatamente la
-     * contraseña; solo los objetos realmente deserializados conservan texto
-     * legado hasta autenticarse.
-     */
     public Usuario(String nombreUsuario, String contrasena, String tipo) {
         this(nombreUsuario, nombreUsuario, "", parsearRol(tipo), true,
                 contrasena == null ? null : contrasena.toCharArray());
     }
 
     public Usuario(String nombreCompleto, String nombreUsuario, String correo,
-            RolUsuario rol, boolean activo, char[] password) {
-        this.identificador = UUID.randomUUID().toString();
+                   RolUsuario rol, boolean activo, char[] password) {
         this.nombreCompleto = limpiar(nombreCompleto);
         this.nombreUsuario = limpiar(nombreUsuario);
         this.correo = limpiar(correo);
@@ -75,12 +59,7 @@ public class Usuario implements Serializable {
             tipo = tipoEsperado;
             cambios++;
         }
-        if (identificador == null || identificador.trim().isEmpty()) {
-            String semilla = "usuario-legado:" + normalizar(nombreUsuario);
-            identificador = UUID.nameUUIDFromBytes(
-                    semilla.getBytes(StandardCharsets.UTF_8)).toString();
-            cambios++;
-        }
+
         if (nombreCompleto == null) {
             nombreCompleto = nombreUsuario == null ? "" : nombreUsuario.trim();
             cambios++;
@@ -105,26 +84,9 @@ public class Usuario implements Serializable {
             permisos = EnumSet.allOf(Permiso.class);
             cambios++;
         }
-        if (passwordHash != null && passwordHash.length > 0) {
-            if (passwordIteraciones <= 0) {
-                passwordIteraciones = PasswordService.ITERACIONES;
-                cambios++;
-            }
-            if (passwordAlgoritmo == null || passwordAlgoritmo.trim().isEmpty()) {
-                passwordAlgoritmo = PasswordService.ALGORITMO;
-                cambios++;
-            }
-            if (contrasena != null) {
-                contrasena = null;
-                cambios++;
-            }
-        }
         return cambios;
     }
 
-    public String getIdentificador() {
-        return identificador;
-    }
 
     public String getNombreCompleto() {
         return nombreCompleto;
@@ -150,10 +112,6 @@ public class Usuario implements Serializable {
         this.correo = limpiar(correo);
     }
 
-    /**
-     * Solo permite inspeccionar el valor legado durante compatibilidad. Para
-     * usuarios nuevos siempre retorna {@code null}.
-     */
     public String getContrasena() {
         return contrasena;
     }
@@ -183,6 +141,14 @@ public class Usuario implements Serializable {
             rol = parsearRol(tipo);
         }
         return rol;
+    }
+
+    public Integer getIdUsuario() {
+        return idUsuario;
+    }
+
+    public void setIdUsuario(Integer idUsuario) {
+        this.idUsuario = idUsuario;
     }
 
     public void setRol(RolUsuario rol) {
@@ -240,54 +206,27 @@ public class Usuario implements Serializable {
         return fechaCreacion;
     }
 
-    public boolean tieneContrasenaProtegida() {
-        return passwordSalt != null && passwordSalt.length > 0
-                && passwordHash != null && passwordHash.length > 0
-                && contrasena == null;
-    }
-
-    public byte[] getPasswordSalt() {
-        return passwordSalt == null ? null : passwordSalt.clone();
-    }
-
-    public byte[] getPasswordHash() {
-        return passwordHash == null ? null : passwordHash.clone();
+    public void setFechaCreacion(LocalDate fechaCreacion) {
+        this.fechaCreacion = fechaCreacion;
     }
 
     public void establecerContrasena(char[] password) {
-        PasswordService.Credencial credencial = PasswordService.crear(password);
-        passwordSalt = credencial.getSalt();
-        passwordHash = credencial.getHash();
-        passwordIteraciones = credencial.getIteraciones();
-        passwordAlgoritmo = credencial.getAlgoritmo();
-        contrasena = null;
+        if (password == null || password.length == 0) {
+            throw new IllegalArgumentException("La contraseña es obligatoria.");
+        }
+        contrasena = new String(password);
     }
 
-    /**
-     * Autentica y migra una contraseña legada a PBKDF2 únicamente en memoria.
-     */
     public boolean autenticar(char[] clave) {
-        if (!isActivo() || clave == null) {
+        if (!isActivo() || clave == null || contrasena == null) {
             return false;
         }
-        if (passwordHash != null && passwordHash.length > 0) {
-            return PasswordService.verificar(clave, passwordSalt, passwordHash,
-                    passwordIteraciones, passwordAlgoritmo);
-        }
-        if (contrasena == null) {
-            return false;
-        }
-        char[] legada = contrasena.toCharArray();
-        boolean coincide;
+        char[] almacenada = contrasena.toCharArray();
         try {
-            coincide = MessageDigestCompat.equals(legada, clave);
+            return MessageDigestCompat.equals(almacenada, clave);
         } finally {
-            Arrays.fill(legada, '\0');
+            Arrays.fill(almacenada, '\0');
         }
-        if (coincide) {
-            establecerContrasena(clave);
-        }
-        return coincide;
     }
 
     public boolean match(String nombre, String clave) {

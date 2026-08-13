@@ -8,6 +8,7 @@ public class ElementoCatalogo implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private Integer id;
     private String identificador;
     private String nombre;
     private Boolean activo;
@@ -71,6 +72,14 @@ public class ElementoCatalogo implements Serializable {
             cambios++;
         }
         return cambios;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
     }
 
     public String getIdentificador() {
