@@ -1,61 +1,32 @@
 package logico;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import Datos.UbicacionDAO;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Catálogo geográfico oficial, inmutable y cargado desde el classpath. */
+/** Catálogo geográfico oficial, inmutable y cargado desde la base de datos. */
 public final class UbicacionService {
 
     public static final String SELECCIONE_PROVINCIA = "Seleccione una provincia";
     public static final String SELECCIONE_MUNICIPIO = "Seleccione un municipio";
-    private static final String RECURSO = "/catalogos/provincias_municipios.tsv";
     private static final UbicacionService INSTANCIA = cargarPredeterminado();
 
     private final LinkedHashMap<String, List<String>> municipiosPorProvincia;
 
-    private UbicacionService(InputStream input) {
-        if (input == null) {
-            throw new IllegalStateException("No se encontró el recurso geográfico " + RECURSO + ".");
-        }
+    private UbicacionService(UbicacionDAO dao) {
         municipiosPorProvincia = new LinkedHashMap<String, List<String>>();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(input, StandardCharsets.UTF_8))) {
-            String linea;
-            int numero = 0;
-            while ((linea = reader.readLine()) != null) {
-                numero++;
-                if (linea.trim().isEmpty() || linea.trim().startsWith("#")) {
-                    continue;
-                }
-                String[] partes = linea.split("\\t", -1);
-                if (partes.length != 2 || partes[0].trim().isEmpty()) {
-                    throw new IllegalStateException(
-                            "Fila geográfica inválida en " + RECURSO + ":" + numero + ".");
-                }
-                ArrayList<String> municipios = new ArrayList<String>();
-                for (String municipio : partes[1].split("\\|")) {
-                    String limpio = municipio.trim();
-                    if (!limpio.isEmpty()) {
-                        municipios.add(limpio);
-                    }
-                }
-                if (municipios.isEmpty()) {
-                    throw new IllegalStateException(
-                            "La provincia " + partes[0] + " no contiene municipios.");
-                }
-                municipiosPorProvincia.put(partes[0].trim(),
-                        Collections.unmodifiableList(municipios));
+        LinkedHashMap<String, ArrayList<String>> datos = dao.listarMunicipiosPorProvincia();
+        for (Map.Entry<String, ArrayList<String>> entrada : datos.entrySet()) {
+            if (entrada.getValue().isEmpty()) {
+                throw new IllegalStateException(
+                        "La provincia " + entrada.getKey() + " no contiene municipios.");
             }
-        } catch (IOException exception) {
-            throw new IllegalStateException("No fue posible leer el catálogo geográfico.", exception);
+            municipiosPorProvincia.put(entrada.getKey(),
+                    Collections.unmodifiableList(new ArrayList<String>(entrada.getValue())));
         }
         if (municipiosPorProvincia.size() != 32) {
             throw new IllegalStateException(
@@ -133,6 +104,6 @@ public final class UbicacionService {
     }
 
     private static UbicacionService cargarPredeterminado() {
-        return new UbicacionService(UbicacionService.class.getResourceAsStream(RECURSO));
+        return new UbicacionService(new UbicacionDAO());
     }
 }

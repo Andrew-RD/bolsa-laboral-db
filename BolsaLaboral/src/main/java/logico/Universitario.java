@@ -5,19 +5,19 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 
 public class Universitario extends Candidato implements Serializable{
-	
+
 	private static final long serialVersionUID = 1L;
-	
+
 	private String universidad;
-	private String universidadIdentificador;
+	private Integer universidadId;
 	private String carrera;
 	private String nivelAcademico;
 	private SituacionAcademica situacionAcademica;
 
 	public Universitario(String codigo, String identificacion, String nombres, String apellidos,
-			LocalDate fechaNacimiento, String genero, String provincia, String municipio, String telefono,
-			String correo, String jornada, String modalidad, String areaDeInteres, float aspiracionSalarial,
-			boolean licenciaConducir, boolean disposicionMudarse, ArrayList<String> idiomas,String universidad, String carrera, String nivelAcademico, String estado) {
+	                     LocalDate fechaNacimiento, String genero, String provincia, String municipio, String telefono,
+	                     String correo, String jornada, String modalidad, String areaDeInteres, float aspiracionSalarial,
+	                     boolean licenciaConducir, boolean disposicionMudarse, ArrayList<String> idiomas,String universidad, String carrera, String nivelAcademico, String estado) {
 		this(codigo, identificacion, nombres, apellidos, fechaNacimiento, genero, provincia, municipio,
 				telefono, correo, jornada, modalidad, areaDeInteres, aspiracionSalarial,
 				licenciaConducir, disposicionMudarse, idiomas, universidad, carrera, nivelAcademico,
@@ -25,11 +25,11 @@ public class Universitario extends Candidato implements Serializable{
 	}
 
 	public Universitario(String codigo, String identificacion, String nombres, String apellidos,
-			LocalDate fechaNacimiento, String genero, String provincia, String municipio, String telefono,
-			String correo, String jornada, String modalidad, String areaDeInteres, float aspiracionSalarial,
-			boolean licenciaConducir, boolean disposicionMudarse, ArrayList<String> idiomas,
-			String universidad, String carrera, String nivelAcademico,
-			SituacionAcademica situacionAcademica, String estado) {
+	                     LocalDate fechaNacimiento, String genero, String provincia, String municipio, String telefono,
+	                     String correo, String jornada, String modalidad, String areaDeInteres, float aspiracionSalarial,
+	                     boolean licenciaConducir, boolean disposicionMudarse, ArrayList<String> idiomas,
+	                     String universidad, String carrera, String nivelAcademico,
+	                     SituacionAcademica situacionAcademica, String estado) {
 		super(codigo, identificacion, nombres, apellidos, fechaNacimiento, genero, provincia, municipio, telefono,
 				correo, jornada, modalidad, areaDeInteres, aspiracionSalarial, licenciaConducir, disposicionMudarse,
 				idiomas, estado);
@@ -51,15 +51,15 @@ public class Universitario extends Candidato implements Serializable{
 		if (catalogos == null) {
 			return 0;
 		}
-		ElementoCatalogo porIdentificador = catalogos.buscarPorIdentificador(
-				TipoCatalogo.UNIVERSIDADES, universidadIdentificador);
-		if (porIdentificador != null) {
+		ElementoCatalogo porId = catalogos.buscarPorId(
+				TipoCatalogo.UNIVERSIDADES, universidadId);
+		if (porId != null) {
 			return 0;
 		}
 		ElementoCatalogo porTexto = catalogos.buscarUniversidad(universidad);
-		if (porTexto != null && !porTexto.getIdentificador().equals(
-				universidadIdentificador)) {
-			universidadIdentificador = porTexto.getIdentificador();
+		if (porTexto != null && !java.util.Objects.equals(
+				porTexto.getId(), universidadId)) {
+			universidadId = porTexto.getId();
 			return 1;
 		}
 		return 0;
@@ -74,21 +74,21 @@ public class Universitario extends Candidato implements Serializable{
 		this.universidad = universidad;
 	}
 
-	public String getUniversidadIdentificador() {
-		return universidadIdentificador;
+	public Integer getUniversidadId() {
+		return universidadId;
 	}
 
 	public void setUniversidadCatalogo(ElementoCatalogo universidadCatalogo) {
 		if (universidadCatalogo == null) {
-			universidadIdentificador = null;
+			universidadId = null;
 			return;
 		}
-		universidadIdentificador = universidadCatalogo.getIdentificador();
+		universidadId = universidadCatalogo.getId();
 		universidad = universidadCatalogo.getNombreCompleto();
 	}
 
 	public void setUniversidadLegada(String universidadLegada) {
-		universidadIdentificador = null;
+		universidadId = null;
 		universidad = universidadLegada;
 	}
 
@@ -125,17 +125,17 @@ public class Universitario extends Candidato implements Serializable{
 	public String getSobreMi() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("Soy ").append(getSituacionAcademica().getEtiqueta().toLowerCase())
-		.append(" de ").append(getCarrera().toLowerCase())
-		.append(" en la universidad ").append(getUniversidad())
-		.append(", con nivel académico ").append(getNivelAcademico().toLowerCase()).append(". ");
+				.append(" de ").append(getCarrera().toLowerCase())
+				.append(" en la universidad ").append(getUniversidad())
+				.append(", con nivel académico ").append(getNivelAcademico().toLowerCase()).append(". ");
 		sb.append("Mi área de interés es ").append(getAreaDeInteres().toLowerCase()).append(". ");
 
 		if (isLicenciaConducir()) sb.append("Cuento con licencia de conducir. ");
 		if (isDisposicionMudarse()) sb.append("Estoy dispuesto a mudarme si es necesario para el empleo. ");
 
 		sb.append("Busco oportunidades en modalidad ").append(getModalidad().toLowerCase())
-		.append(" y jornada ").append(getJornada().toLowerCase())
-		.append(", con una aspiración salarial de RD$").append(getAspiracionSalarial()).append(". ");
+				.append(" y jornada ").append(getJornada().toLowerCase())
+				.append(", con una aspiración salarial de RD$").append(getAspiracionSalarial()).append(". ");
 
 		if (!getIdiomas().isEmpty()) {
 			sb.append("Tengo conocimientos en los siguientes idiomas: ");
@@ -155,7 +155,7 @@ public class Universitario extends Candidato implements Serializable{
 	public String getFormacion() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("Formación universitaria en la carrera de ").append(getCarrera().toLowerCase())
-		.append(" en la universidad ").append(getUniversidad()).append(". ");
+				.append(" en la universidad ").append(getUniversidad()).append(". ");
 		sb.append("Mi nivel académico actual es ").append(getNivelAcademico().toLowerCase()).append(". ");
 
 		return sb.toString().trim();

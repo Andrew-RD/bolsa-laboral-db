@@ -1,22 +1,18 @@
 package logico;
 
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
 public class ElementoCatalogo implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     private Integer id;
-    private String identificador;
     private String nombre;
     private Boolean activo;
     private String siglas;
     private String nombreCompleto;
 
     public ElementoCatalogo(String nombre) {
-        this.identificador = UUID.randomUUID().toString();
         this.nombre = limpiar(nombre);
         this.activo = Boolean.TRUE;
     }
@@ -24,19 +20,6 @@ public class ElementoCatalogo implements Serializable {
     public static ElementoCatalogo universidad(String siglas, String nombreCompleto) {
         ElementoCatalogo universidad = new ElementoCatalogo(nombreCompleto);
         universidad.actualizarDatosUniversidad(siglas, nombreCompleto);
-        return universidad;
-    }
-
-    static ElementoCatalogo universidadPredeterminada(
-            String siglas, String nombreCompleto) {
-        ElementoCatalogo universidad =
-                universidad(siglas, nombreCompleto);
-        String clave = siglas == null || siglas.trim().isEmpty()
-                ? nombreCompleto : siglas;
-        universidad.identificador = UUID.nameUUIDFromBytes(
-                ("catalogo:" + TipoCatalogo.UNIVERSIDADES.name() + ":"
-                        + TextoNormalizer.normalizar(clave))
-                        .getBytes(StandardCharsets.UTF_8)).toString();
         return universidad;
     }
 
@@ -57,12 +40,6 @@ public class ElementoCatalogo implements Serializable {
                 cambios++;
             }
         }
-        if (identificador == null || identificador.trim().isEmpty()) {
-            String semilla = "catalogo:" + tipo.name() + ":" + TextoNormalizer.normalizar(nombre);
-            identificador = UUID.nameUUIDFromBytes(
-                    semilla.getBytes(StandardCharsets.UTF_8)).toString();
-            cambios++;
-        }
         if (activo == null) {
             activo = Boolean.TRUE;
             cambios++;
@@ -80,10 +57,6 @@ public class ElementoCatalogo implements Serializable {
 
     public void setId(Integer id) {
         this.id = id;
-    }
-
-    public String getIdentificador() {
-        return identificador;
     }
 
     public String getNombre() {

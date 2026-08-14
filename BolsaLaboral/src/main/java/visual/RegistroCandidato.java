@@ -520,9 +520,9 @@ public class RegistroCandidato extends JDialog {
                     Universitario universitarioActual = (Universitario) candidatoAct;
                     Universitario universitarioNuevo = (Universitario) nuevoCandidato;
                     ElementoCatalogo universidadCatalogo = BolsaLaboral.getInstancia()
-                            .getCatalogos().buscarPorIdentificador(
+                            .getCatalogos().buscarPorId(
                                     TipoCatalogo.UNIVERSIDADES,
-                                    universitarioNuevo.getUniversidadIdentificador());
+                                    universitarioNuevo.getUniversidadId());
                     if (universidadCatalogo == null) {
                         universitarioActual.setUniversidadLegada(
                                 universitarioNuevo.getUniversidad());
@@ -735,21 +735,21 @@ public class RegistroCandidato extends JDialog {
                 new ArrayList<UniversidadOpcion>();
         Universitario universitario = candidatoAct instanceof Universitario
                 ? (Universitario) candidatoAct : null;
-        String identificador = universitario == null
-                ? null : universitario.getUniversidadIdentificador();
+        Integer id = universitario == null
+                ? null : universitario.getUniversidadId();
         String historica = universitario == null
                 ? null : universitario.getUniversidad();
         for (ElementoCatalogo elemento : BolsaLaboral.getInstancia()
                 .getCatalogos().getUniversidadesParaEdicion(
-                        identificador, historica)) {
+                        id, historica)) {
             opciones.add(new UniversidadOpcion(elemento, null));
         }
         if (universitario != null
                 && BolsaLaboral.getInstancia().getCatalogos()
-                        .buscarPorIdentificador(TipoCatalogo.UNIVERSIDADES,
-                                identificador) == null
+                .buscarPorId(TipoCatalogo.UNIVERSIDADES,
+                        id) == null
                 && BolsaLaboral.getInstancia().getCatalogos()
-                        .buscarUniversidad(historica) == null
+                .buscarUniversidad(historica) == null
                 && historica != null && !historica.trim().isEmpty()) {
             opciones.add(0, new UniversidadOpcion(null, historica));
         }
@@ -757,20 +757,20 @@ public class RegistroCandidato extends JDialog {
     }
 
     private void seleccionarUniversidad(Universitario universitario) {
-        String identificador = universitario.getUniversidadIdentificador();
+        Integer id = universitario.getUniversidadId();
         String texto = logico.TextoNormalizer.normalizar(
                 universitario.getUniversidad());
         for (int index = 0; index < cmbUniversidad.getItemCount(); index++) {
             UniversidadOpcion opcion = cmbUniversidad.getItemAt(index);
-            if ((identificador != null
-                    && identificador.equals(opcion.getIdentificador()))
+            if ((id != null
+                    && id.equals(opcion.getId()))
                     || logico.TextoNormalizer.normalizar(
-                            opcion.getValorPersistido()).equals(texto)
+                    opcion.getValorPersistido()).equals(texto)
                     || (opcion.getElemento() != null
                     && (logico.TextoNormalizer.normalizar(
-                            opcion.getElemento().getSiglas()).equals(texto)
+                    opcion.getElemento().getSiglas()).equals(texto)
                     || logico.TextoNormalizer.normalizar(
-                            opcion.getElemento().getNombreMostrado()).equals(texto)))) {
+                    opcion.getElemento().getNombreMostrado()).equals(texto)))) {
                 cmbUniversidad.setSelectedIndex(index);
                 return;
             }
@@ -802,7 +802,7 @@ public class RegistroCandidato extends JDialog {
     private SituacionAcademica[] situacionesDisponibles() {
         if (candidatoAct instanceof Universitario
                 && ((Universitario) candidatoAct).getSituacionAcademica()
-                        == SituacionAcademica.NO_ESPECIFICADO) {
+                == SituacionAcademica.NO_ESPECIFICADO) {
             return SituacionAcademica.values();
         }
         return new SituacionAcademica[]{SituacionAcademica.ESTUDIANTE,
@@ -840,8 +840,8 @@ public class RegistroCandidato extends JDialog {
             return elemento;
         }
 
-        private String getIdentificador() {
-            return elemento == null ? null : elemento.getIdentificador();
+        private Integer getId() {
+            return elemento == null ? null : elemento.getId();
         }
 
         private String getValorPersistido() {

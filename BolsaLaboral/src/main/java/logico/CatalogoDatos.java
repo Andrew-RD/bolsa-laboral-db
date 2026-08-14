@@ -1,12 +1,15 @@
 package logico;
 
+import Datos.CatalogoDAO;
+import Datos.RequerimientoDAO;
+import Datos.UniversidadDAO;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 
-/** Estado serializable de los catálogos empresariales editables. */
 public class CatalogoDatos implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -14,7 +17,26 @@ public class CatalogoDatos implements Serializable {
     private EnumMap<TipoCatalogo, ArrayList<ElementoCatalogo>> elementos;
 
     public CatalogoDatos() {
+        this(new CatalogoDAO("idiomas", "id_idioma"),
+                new CatalogoDAO("sectores", "id_sector"),
+                new CatalogoDAO("areasLaborales", "id_areaLaboral"),
+                new RequerimientoDAO("carreras"),
+                new RequerimientoDAO("areasTecnicas"),
+                new RequerimientoDAO("habilidades"),
+                new UniversidadDAO());
+    }
+
+    public CatalogoDatos(CatalogoDAO idiomasDAO, CatalogoDAO sectoresDAO, CatalogoDAO areasLaboralesDAO,
+                         RequerimientoDAO carrerasDAO, RequerimientoDAO areasTecnicasDAO,
+                         RequerimientoDAO habilidadesDAO, UniversidadDAO universidadDAO) {
         elementos = new EnumMap<TipoCatalogo, ArrayList<ElementoCatalogo>>(TipoCatalogo.class);
+        elementos.put(TipoCatalogo.IDIOMAS, idiomasDAO.listarTodos());
+        elementos.put(TipoCatalogo.SECTORES_EMPRESARIALES, sectoresDAO.listarTodos());
+        elementos.put(TipoCatalogo.AREAS_LABORALES, areasLaboralesDAO.listarTodos());
+        elementos.put(TipoCatalogo.CARRERAS, carrerasDAO.listarTodos());
+        elementos.put(TipoCatalogo.AREAS_TECNICAS, areasTecnicasDAO.listarTodos());
+        elementos.put(TipoCatalogo.HABILIDADES, habilidadesDAO.listarTodos());
+        elementos.put(TipoCatalogo.UNIVERSIDADES, universidadDAO.listarTodos());
         migrarDatosDeserializados();
     }
 
@@ -34,29 +56,6 @@ public class CatalogoDatos implements Serializable {
             for (ElementoCatalogo elemento : lista) {
                 if (elemento != null) {
                     cambios += elemento.migrarDatosDeserializados(tipo);
-                }
-            }
-            if (tipo == TipoCatalogo.UNIVERSIDADES) {
-                for (String[] universidad : universidadesPredeterminadas()) {
-                    ElementoCatalogo existente = buscarUniversidad(
-                            universidad[0], universidad[1], null);
-                    if (existente == null) {
-                        lista.add(ElementoCatalogo.universidadPredeterminada(
-                                universidad[0], universidad[1]));
-                        cambios++;
-                    } else if (!universidad[0].equals(existente.getSiglas())
-                            || !universidad[1].equals(existente.getNombreCompleto())) {
-                        existente.actualizarDatosUniversidad(
-                                universidad[0], universidad[1]);
-                        cambios++;
-                    }
-                }
-            } else {
-                for (String predeterminado : predeterminados(tipo)) {
-                    if (buscar(tipo, predeterminado) == null) {
-                        lista.add(new ElementoCatalogo(predeterminado));
-                        cambios++;
-                    }
                 }
             }
         }
@@ -84,11 +83,11 @@ public class CatalogoDatos implements Serializable {
     }
 
     public List<ElementoCatalogo> getUniversidadesParaEdicion(
-            String identificador, String valorHistorico) {
+            Integer id, String valorHistorico) {
         ArrayList<ElementoCatalogo> universidades =
                 new ArrayList<ElementoCatalogo>(getUniversidadesActivas());
-        ElementoCatalogo historica = buscarPorIdentificador(
-                TipoCatalogo.UNIVERSIDADES, identificador);
+        ElementoCatalogo historica = buscarPorId(
+                TipoCatalogo.UNIVERSIDADES, id);
         if (historica == null) {
             historica = buscarUniversidad(valorHistorico);
         }
@@ -117,15 +116,13 @@ public class CatalogoDatos implements Serializable {
         return valores;
     }
 
-    public ElementoCatalogo buscarPorIdentificador(
-            TipoCatalogo tipo, String identificador) {
-        if (tipo == null || identificador == null
-                || identificador.trim().isEmpty()) {
+    public ElementoCatalogo buscarPorId(
+            TipoCatalogo tipo, Integer id) {
+        if (tipo == null || id == null) {
             return null;
         }
         for (ElementoCatalogo elemento : getElementos(tipo)) {
-            if (elemento != null
-                    && identificador.equals(elemento.getIdentificador())) {
+            if (elemento != null && id.equals(elemento.getId())) {
                 return elemento;
             }
         }
@@ -164,7 +161,7 @@ public class CatalogoDatos implements Serializable {
     }
 
     void modificarUniversidad(ElementoCatalogo universidad,
-            String siglas, String nombreCompleto) {
+                              String siglas, String nombreCompleto) {
         if (universidad == null || !getElementos(TipoCatalogo.UNIVERSIDADES)
                 .contains(universidad)) {
             throw new IllegalArgumentException(
@@ -172,6 +169,13 @@ public class CatalogoDatos implements Serializable {
         }
         validarUniversidad(siglas, nombreCompleto, universidad);
         universidad.actualizarDatosUniversidad(siglas, nombreCompleto);
+    }
+
+    void quitar(TipoCatalogo tipo, ElementoCatalogo elemento) {
+        ArrayList<ElementoCatalogo> lista = elementos.get(tipo);
+        if (lista != null) {
+            lista.remove(elemento);
+        }
     }
 
     ElementoCatalogo buscar(TipoCatalogo tipo, String nombre) {
@@ -193,7 +197,7 @@ public class CatalogoDatos implements Serializable {
     }
 
     private void validarUniversidad(String siglas, String nombreCompleto,
-            ElementoCatalogo excluir) {
+                                    ElementoCatalogo excluir) {
         if (nombreCompleto == null || nombreCompleto.trim().isEmpty()) {
             throw new IllegalArgumentException(
                     "El nombre completo de la universidad es obligatorio.");
@@ -205,7 +209,7 @@ public class CatalogoDatos implements Serializable {
     }
 
     private ElementoCatalogo buscarUniversidad(String siglas,
-            String nombreCompleto, ElementoCatalogo excluir) {
+                                               String nombreCompleto, ElementoCatalogo excluir) {
         String corto = TextoNormalizer.normalizar(siglas);
         String completo = TextoNormalizer.normalizar(nombreCompleto);
         for (ElementoCatalogo elemento : getElementos(
@@ -243,50 +247,5 @@ public class CatalogoDatos implements Serializable {
             }
         }
         return false;
-    }
-
-    private static String[] predeterminados(TipoCatalogo tipo) {
-        switch (tipo) {
-            case UNIVERSIDADES:
-                return new String[0];
-            case CARRERAS:
-                return new String[]{"Administración de Empresas", "Arquitectura", "Contabilidad",
-                        "Derecho", "Ingeniería Civil", "Ingeniería Industrial",
-                        "Ingeniería de Sistemas", "Medicina", "Mercadeo", "Psicología"};
-            case AREAS_TECNICAS:
-                return new String[]{"Administración", "Contabilidad", "Electricidad",
-                        "Electrónica", "Enfermería", "Informática", "Mecánica", "Refrigeración"};
-            case HABILIDADES:
-                return new String[]{"Albañilería", "Carpintería", "Conducción", "Electricidad",
-                        "Jardinería", "Limpieza", "Plomería", "Seguridad"};
-            case IDIOMAS:
-                return new String[]{"Español", "Inglés", "Francés", "Portugués", "Italiano",
-                        "Alemán", "Mandarín"};
-            case SECTORES_EMPRESARIALES:
-                return new String[]{"Agricultura", "Comercio", "Construcción", "Educación",
-                        "Finanzas", "Industria", "Salud", "Servicios", "Tecnología", "Turismo"};
-            case AREAS_LABORALES:
-                return new String[]{"Administración", "Agricultura", "Arte", "Atención al Cliente",
-                        "Comercio", "Construcción", "Educación", "Finanzas", "Jurídico", "Limpieza",
-                        "Marketing", "Operaciones", "Recursos Humanos", "Salud", "Seguridad",
-                        "Tecnología", "TI", "Transporte", "Turismo"};
-            default:
-                throw new IllegalArgumentException("Tipo de catálogo no soportado: " + tipo);
-        }
-    }
-
-    private static String[][] universidadesPredeterminadas() {
-        return new String[][]{
-                {"PUCMM", "Pontificia Universidad Católica Madre y Maestra"},
-                {"UASD", "Universidad Autónoma de Santo Domingo"},
-                {"INTEC", "Instituto Tecnológico de Santo Domingo"},
-                {"UNPHU", "Universidad Nacional Pedro Henríquez Ureña"},
-                {"UTESA", "Universidad Tecnológica de Santiago"},
-                {"UNAPEC", "Universidad APEC"},
-                {"O&M", "Universidad Dominicana O&M"},
-                {"UCE", "Universidad Central del Este"},
-                {"UCNE", "Universidad Católica Nordestana"},
-                {"ISA", "Universidad ISA"}
-        };
     }
 }

@@ -94,14 +94,7 @@ public class UbicacionCatalogoTest {
             assertFalse(universidad.getNombreCompleto().trim().isEmpty());
             assertEquals(requerida + " — " + universidad.getNombreCompleto(),
                     universidad.getNombreMostrado());
-            assertFalse(universidad.getIdentificador().trim().isEmpty());
         }
-        CatalogoDatos otraInicializacion = new CatalogoDatos();
-        assertEquals(
-                bolsa.getCatalogos().buscarUniversidad("PUCMM")
-                        .getIdentificador(),
-                otraInicializacion.buscarUniversidad("PUCMM")
-                        .getIdentificador());
         assertEquals(0, bolsa.getCatalogos().migrarDatosDeserializados());
     }
 
@@ -109,7 +102,7 @@ public class UbicacionCatalogoTest {
     public void universidadRegistraYModificaSiglasYNombreSinCambiarIdentidad() {
         ElementoCatalogo universidad = servicio.agregarUniversidad(
                 "UPR", "Universidad de Prueba");
-        String identificador = universidad.getIdentificador();
+        Integer id = universidad.getId();
         Universitario candidato = universitario("Universidad de Prueba");
         candidato.setUniversidadCatalogo(universidad);
         bolsa.getCandidatos().add(candidato);
@@ -117,13 +110,13 @@ public class UbicacionCatalogoTest {
         servicio.modificarUniversidad(universidad,
                 "UPR-N", "Universidad de Prueba Renovada");
 
-        assertEquals(identificador, universidad.getIdentificador());
+        assertEquals(id, universidad.getId());
         assertEquals("UPR-N", universidad.getSiglas());
         assertEquals("Universidad de Prueba Renovada",
                 universidad.getNombreCompleto());
         assertEquals("UPR-N — Universidad de Prueba Renovada",
                 universidad.getNombreMostrado());
-        assertEquals(identificador, candidato.getUniversidadIdentificador());
+        assertEquals(id, candidato.getUniversidadId());
         assertEquals("Universidad de Prueba Renovada",
                 candidato.getUniversidad());
     }
@@ -161,7 +154,7 @@ public class UbicacionCatalogoTest {
         assertFalse(bolsa.getCatalogos().getUniversidadesActivas()
                 .contains(universidad));
         assertTrue(bolsa.getCatalogos().getUniversidadesParaEdicion(
-                universidad.getIdentificador(),
+                universidad.getId(),
                 universidad.getNombreCompleto()).contains(universidad));
         assertEquals("Universidad Histórica de Prueba",
                 universidad.getNombreMostrado());
@@ -169,22 +162,23 @@ public class UbicacionCatalogoTest {
 
     @Test
     public void universidadLegadaSeEnlazaEnMemoriaDeFormaIdempotente() {
-        Universitario conocida = universitario(" pucmm ");
-        assertTrue(conocida.getUniversidadIdentificador() == null);
+        servicio.agregarUniversidad("UPR2", "Universidad de Prueba Dos");
+        Universitario conocida = universitario(" upr2 ");
+        assertTrue(conocida.getUniversidadId() == null);
         assertEquals(1, conocida.migrarUniversidadDeserializada(
                 bolsa.getCatalogos()));
-        assertEquals("PUCMM", bolsa.getCatalogos().buscarPorIdentificador(
+        assertEquals("UPR2", bolsa.getCatalogos().buscarPorId(
                 TipoCatalogo.UNIVERSIDADES,
-                conocida.getUniversidadIdentificador()).getSiglas());
+                conocida.getUniversidadId()).getSiglas());
         assertEquals(0, conocida.migrarUniversidadDeserializada(
                 bolsa.getCatalogos()));
-        assertEquals(" pucmm ", conocida.getUniversidad());
+        assertEquals(" upr2 ", conocida.getUniversidad());
 
         Universitario desconocida =
                 universitario("Universidad Legada Fuera del Catálogo");
         assertEquals(0, desconocida.migrarUniversidadDeserializada(
                 bolsa.getCatalogos()));
-        assertTrue(desconocida.getUniversidadIdentificador() == null);
+        assertTrue(desconocida.getUniversidadId() == null);
         assertEquals("Universidad Legada Fuera del Catálogo",
                 desconocida.getUniversidad());
     }
