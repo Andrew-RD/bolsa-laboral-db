@@ -67,14 +67,17 @@ public final class GestionCandidatoService {
         bolsa.getCandidatos().set(indice, candidatoModificar);
     }
 
+    public int contarSolicitudesVinculadas(Candidato candidato) {
+        if (candidato == null) {
+            throw new IllegalArgumentException("El candidato es obligatorio.");
+        }
+        return candidatoDAO.contarSolicitudes(candidato);
+    }
+
     public void eliminar(Candidato candidatoEliminar) throws NotRemovableException {
         exigirGestionCandidatos();
         if (candidatoEliminar == null) {
             throw new IllegalArgumentException("El candidato es obligatorio.");
-        }
-        if (!bolsa.candidatoEliminable(candidatoEliminar)) {
-            throw new NotRemovableException(
-                    "El candidato no puede ser eliminado ya que esta vinculado con una solicitud.");
         }
 
         candidatoDAO.eliminar(candidatoEliminar);

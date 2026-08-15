@@ -1,5 +1,6 @@
 package Datos;
 
+import exception.NotRemovableException;
 import logico.Candidato;
 import logico.Obrero;
 import logico.SituacionAcademica;
@@ -129,6 +130,16 @@ public class CandidatoDAO {
 
     private static final String DELETE_CANDIDATO =
             "DELETE FROM candidatos WHERE id_candidato = ?";
+
+    private static final String COUNT_SOLICITUDES =
+            "SELECT COUNT(*) FROM solicitudes WHERE id_candidato = ?";
+
+    private static final String DELETE_CONTRATACIONES_DEL_CANDIDATO =
+            "DELETE FROM Contrataciones WHERE id_solicitud IN " +
+                    "(SELECT id_solicitud FROM solicitudes WHERE id_candidato = ?)";
+
+    private static final String DELETE_SOLICITUDES_DEL_CANDIDATO =
+            "DELETE FROM solicitudes WHERE id_candidato = ?";
 
     private static final String SELECT_ID_AREA_LABORAL =
             "SELECT id_areaLaboral FROM areasLaborales WHERE nombre = ?";
@@ -261,12 +272,31 @@ public class CandidatoDAO {
         }
     }
 
-    public void eliminar(Candidato candidato) {
+    public int contarSolicitudes(Candidato candidato) {
+        int idCandidato = extraerIdDelCodigo(candidato.getCodigo());
+
+        try (Connection con = Conexion.obtenerConexion();
+             PreparedStatement ps = con.prepareStatement(COUNT_SOLICITUDES)) {
+
+            ps.setInt(1, idCandidato);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error contando las solicitudes del candidato", e);
+        }
+        return 0;
+    }
+
+    public void eliminar(Candidato candidato) throws NotRemovableException {
         int idCandidato = extraerIdDelCodigo(candidato.getCodigo());
 
         try (Connection con = Conexion.obtenerConexion()) {
             con.setAutoCommit(false);
             try {
+                eliminarSolicitudesYVinculos(con, idCandidato);
                 eliminarSubtipoYVinculos(con, idCandidato);
 
                 try (PreparedStatement ps = con.prepareStatement(DELETE_CANDIDATO)) {
@@ -281,6 +311,11 @@ public class CandidatoDAO {
                 con.commit();
             } catch (SQLException e) {
                 con.rollback();
+                if (esViolacionDeIntegridadReferencial(e)) {
+                    throw new NotRemovableException(
+                            "El candidato no puede ser eliminado porque tiene información vinculada que no pudo eliminarse automáticamente.",
+                            e);
+                }
                 throw e;
             } finally {
                 con.setAutoCommit(true);
@@ -288,6 +323,29 @@ public class CandidatoDAO {
         } catch (SQLException e) {
             throw new RuntimeException("Error eliminando el candidato de la base de datos", e);
         }
+    }
+
+    private void eliminarSolicitudesYVinculos(Connection con, int idCandidato) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement(DELETE_CONTRATACIONES_DEL_CANDIDATO)) {
+            ps.setInt(1, idCandidato);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = con.prepareStatement(DELETE_SOLICITUDES_DEL_CANDIDATO)) {
+            ps.setInt(1, idCandidato);
+            ps.executeUpdate();
+        }
+    }
+
+    private boolean esViolacionDeIntegridadReferencial(SQLException e) {
+        String sqlState = e.getSQLState();
+        if (sqlState != null && sqlState.startsWith("23")) {
+            return true;
+        }
+        String mensaje = e.getMessage();
+        return mensaje != null
+                && (mensaje.contains("REFERENCE constraint")
+                || mensaje.contains("FOREIGN KEY constraint")
+                || mensaje.contains("conflicted with the"));
     }
 
     private void eliminarSubtipoYVinculos(Connection con, int idCandidato) throws SQLException {

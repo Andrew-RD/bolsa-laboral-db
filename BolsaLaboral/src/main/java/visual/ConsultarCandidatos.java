@@ -176,7 +176,16 @@ public class ConsultarCandidatos extends JDialog {
 				btnDelete.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						if(seleccionado != null) {
-							int option = JOptionPane.showConfirmDialog(null, "¿Esta seguro que desea eliminar al candidato " + seleccionado.getNombres() + " " + seleccionado.getApellidos() + " que posee el ID: "+seleccionado.getCodigo()+"?", "Eliminar", JOptionPane.WARNING_MESSAGE);
+							int cantidadSolicitudes = servicio.contarSolicitudesVinculadas(seleccionado);
+							String mensaje = "¿Esta seguro que desea eliminar al candidato "
+									+ seleccionado.getNombres() + " " + seleccionado.getApellidos()
+									+ " que posee el ID: " + seleccionado.getCodigo() + "?";
+							if (cantidadSolicitudes > 0) {
+								mensaje += "\n\nEste candidato tiene " + cantidadSolicitudes
+										+ (cantidadSolicitudes == 1 ? " solicitud registrada" : " solicitudes registradas")
+										+ ". Si continúa, también se eliminarán esas solicitudes y las contrataciones asociadas a ellas.";
+							}
+							int option = JOptionPane.showConfirmDialog(null, mensaje, "Eliminar", JOptionPane.WARNING_MESSAGE);
 							if(option == JOptionPane.OK_OPTION){
 								try {
 									servicio.eliminar(seleccionado);

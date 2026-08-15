@@ -1,5 +1,6 @@
 package Datos;
 
+import exception.NotRemovableException;
 import logico.CentroEmpleador;
 
 import java.sql.Connection;
@@ -39,6 +40,29 @@ public class CentroEmpleadorDAO {
 
     private static final String DELETE =
             "DELETE FROM centrosEmpleadores WHERE id_centroEmpleador = ?";
+
+    private static final String COUNT_OFERTAS =
+            "SELECT COUNT(*) FROM ofertas WHERE id_centroEmpleador = ?";
+
+    private static final String DELETE_OFERTAS_IDIOMAS_DEL_CENTRO =
+            "DELETE FROM ofertas_idiomas WHERE id_oferta IN " +
+                    "(SELECT id_oferta FROM ofertas WHERE id_centroEmpleador = ?)";
+
+    private static final String DELETE_OFERTAS_REQUERIMIENTOS_DEL_CENTRO =
+            "DELETE FROM ofertas_requerimientos WHERE id_oferta IN " +
+                    "(SELECT id_oferta FROM ofertas WHERE id_centroEmpleador = ?)";
+
+    private static final String DELETE_CONTRATACIONES_DEL_CENTRO =
+            "DELETE FROM Contrataciones WHERE id_solicitud IN " +
+                    "(SELECT id_solicitud FROM solicitudes WHERE id_oferta IN " +
+                    "(SELECT id_oferta FROM ofertas WHERE id_centroEmpleador = ?))";
+
+    private static final String DELETE_SOLICITUDES_DEL_CENTRO =
+            "DELETE FROM solicitudes WHERE id_oferta IN " +
+                    "(SELECT id_oferta FROM ofertas WHERE id_centroEmpleador = ?)";
+
+    private static final String DELETE_OFERTAS_DEL_CENTRO =
+            "DELETE FROM ofertas WHERE id_centroEmpleador = ?";
 
     private static final String INSERT =
             "INSERT INTO centrosEmpleadores " +
@@ -184,25 +208,55 @@ public class CentroEmpleadorDAO {
         }
     }
 
-    public void eliminar(CentroEmpleador centro) {
+    public int contarOfertas(CentroEmpleador centro) {
+        int idCentro = extraerIdDelCodigo(centro.getCodigo());
+
+        try (Connection con = Conexion.obtenerConexion();
+             PreparedStatement ps = con.prepareStatement(COUNT_OFERTAS)) {
+
+            ps.setInt(1, idCentro);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Error contando las ofertas del centro empleador",
+                    e
+            );
+        }
+        return 0;
+    }
+
+    public void eliminar(CentroEmpleador centro) throws NotRemovableException {
         int idCentro = extraerIdDelCodigo(centro.getCodigo());
 
         try (Connection con = Conexion.obtenerConexion()) {
             con.setAutoCommit(false);
-            try (PreparedStatement ps = con.prepareStatement(DELETE)) {
-                ps.setInt(1, idCentro);
+            try {
+                eliminarOfertasYVinculos(con, idCentro);
 
-                int filasEliminadas = ps.executeUpdate();
+                try (PreparedStatement ps = con.prepareStatement(DELETE)) {
+                    ps.setInt(1, idCentro);
 
-                if (filasEliminadas == 0) {
-                    throw new SQLException(
-                            "No existe un centro empleador con id = "
-                                    + idCentro
-                    );
+                    int filasEliminadas = ps.executeUpdate();
+
+                    if (filasEliminadas == 0) {
+                        throw new SQLException(
+                                "No existe un centro empleador con id = "
+                                        + idCentro
+                        );
+                    }
                 }
                 con.commit();
             } catch (SQLException e) {
                 con.rollback();
+                if (esViolacionDeIntegridadReferencial(e)) {
+                    throw new NotRemovableException(
+                            "El centro de trabajo no puede ser eliminado porque tiene información vinculada que no pudo eliminarse automáticamente.",
+                            e);
+                }
                 throw e;
             } finally {
                 con.setAutoCommit(true);
@@ -214,6 +268,41 @@ public class CentroEmpleadorDAO {
                     e
             );
         }
+    }
+
+    private void eliminarOfertasYVinculos(Connection con, int idCentro) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement(DELETE_OFERTAS_IDIOMAS_DEL_CENTRO)) {
+            ps.setInt(1, idCentro);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = con.prepareStatement(DELETE_OFERTAS_REQUERIMIENTOS_DEL_CENTRO)) {
+            ps.setInt(1, idCentro);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = con.prepareStatement(DELETE_CONTRATACIONES_DEL_CENTRO)) {
+            ps.setInt(1, idCentro);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = con.prepareStatement(DELETE_SOLICITUDES_DEL_CENTRO)) {
+            ps.setInt(1, idCentro);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = con.prepareStatement(DELETE_OFERTAS_DEL_CENTRO)) {
+            ps.setInt(1, idCentro);
+            ps.executeUpdate();
+        }
+    }
+
+    private boolean esViolacionDeIntegridadReferencial(SQLException e) {
+        String sqlState = e.getSQLState();
+        if (sqlState != null && sqlState.startsWith("23")) {
+            return true;
+        }
+        String mensaje = e.getMessage();
+        return mensaje != null
+                && (mensaje.contains("REFERENCE constraint")
+                || mensaje.contains("FOREIGN KEY constraint")
+                || mensaje.contains("conflicted with the"));
     }
 
     private int buscarIdSector(

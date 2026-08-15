@@ -180,7 +180,15 @@ public class ConsultarCentros extends JDialog {
 				btnDelete.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						if(seleccionado != null) {
-							int option = JOptionPane.showConfirmDialog(null, "¿Esta seguro que desea eliminar el centro de trabajo llamado " + seleccionado.getNombre() + " que posee el ID: "+seleccionado.getCodigo()+"?", "Eliminar", JOptionPane.WARNING_MESSAGE);
+							int cantidadOfertas = servicio.contarOfertasVinculadas(seleccionado);
+							String mensaje = "¿Esta seguro que desea eliminar el centro de trabajo llamado "
+									+ seleccionado.getNombre() + " que posee el ID: " + seleccionado.getCodigo() + "?";
+							if (cantidadOfertas > 0) {
+								mensaje += "\n\nEste centro tiene " + cantidadOfertas
+										+ (cantidadOfertas == 1 ? " oferta laboral registrada" : " ofertas laborales registradas")
+										+ ". Si continúa, también se eliminarán esas ofertas y las solicitudes/contrataciones asociadas a ellas.";
+							}
+							int option = JOptionPane.showConfirmDialog(null, mensaje, "Eliminar", JOptionPane.WARNING_MESSAGE);
 							if(option == JOptionPane.OK_OPTION){
 								btnDelete.setEnabled(true);
 								btnUpdate.setEnabled(true);
