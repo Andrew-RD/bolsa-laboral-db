@@ -3,6 +3,7 @@ package visual;
 import exception.FormatException;
 import logico.BolsaLaboral;
 import logico.CentroEmpleador;
+import logico.GestionCentroService;
 import logico.TipoCatalogo;
 import logico.ResultadoDocumento;
 import logico.RncValidator;
@@ -21,6 +22,10 @@ import java.awt.GridBagConstraints;
 import java.util.Objects;
 
 public class RegistroCentro extends JDialog {
+
+    private static final String CODIGO_PENDIENTE = "(Se asignará al guardar)";
+
+    private final GestionCentroService servicio = new GestionCentroService(BolsaLaboral.getInstancia());
 
     private CentroEmpleador centroAct;
     private JTextField txtCodigo;
@@ -51,7 +56,7 @@ public class RegistroCentro extends JDialog {
         txtCodigo = textField();
         txtCodigo.setEditable(false);
         txtCodigo.setFocusable(false);
-        txtCodigo.setText("CEN-" + BolsaLaboral.genCodigoCentro);
+        txtCodigo.setText(CODIGO_PENDIENTE);
         UIUtils.addFormRow(form, 0, "Código:", txtCodigo);
 
         JSeparator separator = new JSeparator();
@@ -133,33 +138,35 @@ public class RegistroCentro extends JDialog {
                 centroAct.setRnc(rnc);
                 centroAct.setSector(cmbSector.getSelectedItem().toString());
                 centroAct.setTelefono(txtTelefono.getText());
-                if (BolsaLaboral.getInstancia().modificarCentroTrabajo(centroAct)) {
-                    ConsultarCentros.cargarCentros();
-                    JOptionPane.showMessageDialog(this,
-                            "El centro " + txtNombre.getText() + " ha sido modificado exitosamente.",
-                            "Información", JOptionPane.INFORMATION_MESSAGE);
-                    dispose();
-                } else {
-                    JOptionPane.showMessageDialog(this,
-                            "El centro " + txtNombre.getText() + " no logró ser modificado.");
-                }
+                servicio.modificar(centroAct);
+                ConsultarCentros.cargarCentros();
+                JOptionPane.showMessageDialog(this,
+                        "El centro " + txtNombre.getText() + " ha sido modificado exitosamente.",
+                        "Información", JOptionPane.INFORMATION_MESSAGE);
+                dispose();
             } else {
                 String rnc = BolsaLaboral.getInstancia().prepararRnc(
                         null, txtRNC.getText().trim());
                 CentroEmpleador nuevoCentro = new CentroEmpleador(
-                        txtCodigo.getText(), txtNombre.getText(), cmbSector.getSelectedItem().toString(),
+                        null, txtNombre.getText(), cmbSector.getSelectedItem().toString(),
                         ubicacion.getProvincia(), ubicacion.getMunicipio(), txtTelefono.getText(),
                         txtCorreo.getText(), rnc);
-                BolsaLaboral.getInstancia().registrarCentroTrabajo(nuevoCentro);
+                servicio.registrar(nuevoCentro);
                 JOptionPane.showMessageDialog(this,
-                        "El centro de trabajo ha sido agregado correctamente.",
+                        "El centro de trabajo ha sido agregado correctamente con el código "
+                                + nuevoCentro.getCodigo() + ".",
                         "Información", JOptionPane.INFORMATION_MESSAGE);
-                txtCodigo.setText("CEN-" + BolsaLaboral.genCodigoCentro);
+                txtCodigo.setText(CODIGO_PENDIENTE);
                 limpiar();
             }
         } catch (FormatException | IllegalArgumentException | SecurityException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(),
                     "Advertencia", JOptionPane.WARNING_MESSAGE);
+        } catch (RuntimeException exception) {
+            JOptionPane.showMessageDialog(this,
+                    "No fue posible guardar el centro empleador en la base de datos:\n"
+                            + exception.getMessage(),
+                    "Error de conexión", JOptionPane.ERROR_MESSAGE);
         }
     }
 

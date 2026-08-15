@@ -1,5 +1,6 @@
 package visual;
 
+import Datos.CentroEmpleadorDAO;
 import Datos.UsuarioDAO;
 import exception.AuthException;
 import logico.BolsaLaboral;
@@ -155,13 +156,14 @@ public class Login extends JFrame {
         getRootPane().setDefaultButton(btnIniciarSesion);
         UIUtils.finishFrame(this, 700, 500);
 
-        cargarUsuarios();
+        cargarDatosDesdeBaseDeDatos();
     }
 
 
-    private void cargarUsuarios() {
+    private void cargarDatosDesdeBaseDeDatos() {
         try {
             BolsaLaboral.getInstancia().setUsuarios(new UsuarioDAO().listarTodos());
+            BolsaLaboral.getInstancia().setCentros(new CentroEmpleadorDAO().listarTodos());
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             JOptionPane.showMessageDialog(this,
