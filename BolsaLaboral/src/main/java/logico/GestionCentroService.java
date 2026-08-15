@@ -1,6 +1,7 @@
 package logico;
 
 import Datos.CentroEmpleadorDAO;
+import exception.NotRemovableException;
 
 import java.util.ArrayList;
 
@@ -57,6 +58,20 @@ public final class GestionCentroService {
 
         centroDAO.modificar(centroModificar);
         bolsa.getCentros().set(indice, centroModificar);
+    }
+
+    public void eliminar(CentroEmpleador centroEliminar) throws NotRemovableException {
+        exigirGestionCentros();
+        if (centroEliminar == null) {
+            throw new IllegalArgumentException("El centro empleador es obligatorio.");
+        }
+        if (!bolsa.centroEliminable(centroEliminar)) {
+            throw new NotRemovableException(
+                    "El centro de trabajo no puede ser eliminado ya que posee ofertas existentes.");
+        }
+
+        centroDAO.eliminar(centroEliminar);
+        bolsa.getCentros().remove(centroEliminar);
     }
 
     private void exigirGestionCentros() {

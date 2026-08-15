@@ -37,6 +37,9 @@ public class CentroEmpleadorDAO {
                     "JOIN provincias p ON p.id_provincia = m.id_provincia " +
                     "WHERE ce.rnc = ?";
 
+    private static final String DELETE =
+            "DELETE FROM centrosEmpleadores WHERE id_centroEmpleador = ?";
+
     private static final String INSERT =
             "INSERT INTO centrosEmpleadores " +
                     "(rnc, nombre, telefono, correo, id_sector, id_municipio) " +
@@ -176,6 +179,38 @@ public class CentroEmpleadorDAO {
         } catch (SQLException e) {
             throw new RuntimeException(
                     "Error modificando el centro empleador",
+                    e
+            );
+        }
+    }
+
+    public void eliminar(CentroEmpleador centro) {
+        int idCentro = extraerIdDelCodigo(centro.getCodigo());
+
+        try (Connection con = Conexion.obtenerConexion()) {
+            con.setAutoCommit(false);
+            try (PreparedStatement ps = con.prepareStatement(DELETE)) {
+                ps.setInt(1, idCentro);
+
+                int filasEliminadas = ps.executeUpdate();
+
+                if (filasEliminadas == 0) {
+                    throw new SQLException(
+                            "No existe un centro empleador con id = "
+                                    + idCentro
+                    );
+                }
+                con.commit();
+            } catch (SQLException e) {
+                con.rollback();
+                throw e;
+            } finally {
+                con.setAutoCommit(true);
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Error eliminando el centro empleador",
                     e
             );
         }

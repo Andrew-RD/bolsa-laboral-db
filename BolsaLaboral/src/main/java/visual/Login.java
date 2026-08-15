@@ -1,5 +1,6 @@
 package visual;
 
+import Datos.CandidatoDAO;
 import Datos.CentroEmpleadorDAO;
 import Datos.UsuarioDAO;
 import exception.AuthException;
@@ -164,6 +165,7 @@ public class Login extends JFrame {
         try {
             BolsaLaboral.getInstancia().setUsuarios(new UsuarioDAO().listarTodos());
             BolsaLaboral.getInstancia().setCentros(new CentroEmpleadorDAO().listarTodos());
+            BolsaLaboral.getInstancia().setCandidatos(new CandidatoDAO().listarTodos());
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             JOptionPane.showMessageDialog(this,

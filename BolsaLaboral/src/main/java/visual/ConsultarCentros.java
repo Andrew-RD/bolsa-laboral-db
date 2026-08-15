@@ -34,22 +34,23 @@ public class ConsultarCentros extends JDialog {
 	public static JTable table;
 	public static DefaultTableModel modelo = new DefaultTableModel() {
 		@Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-		
+		public boolean isCellEditable(int row, int column) {
+			return false;
+		}
+
 		public Class getColumnClass(int column) {
 			Object value = getRowCount() == 0 ? null : getValueAt(0, column);
 			return value == null ? Object.class : value.getClass();
 		}
 	};
 	public static Object[] row;
+	private final GestionCentroService servicio = new GestionCentroService(BolsaLaboral.getInstancia());
 	private CentroEmpleador seleccionado = null;
 	private JButton btnUpdate;
 	private JButton btnDelete;
 	private JTextField txtFiltro;
 	private JButton btnVisualizar;
-	
+
 	/**
 	 * Create the dialog.
 	 */
@@ -103,7 +104,7 @@ public class ConsultarCentros extends JDialog {
 				JLabel lblIconFiltrar = new JLabel("");
 				lblIconFiltrar.setIcon(UIUtils.icon("filtrar.png"));
 				pnlFiltro.add(lblIconFiltrar);
-				
+
 			}
 			{
 				JLabel lblNewLabel = new JLabel("Criterio del Filtro: ");
@@ -153,9 +154,9 @@ public class ConsultarCentros extends JDialog {
 							btnDelete.setEnabled(true);
 							btnUpdate.setEnabled(true);
 							btnVisualizar.setEnabled(true);
-						VistaCentro vist = new VistaCentro(seleccionado);
-						vist.setModal(true);
-						vist.setLocationRelativeTo(ConsultarCentros.this);
+							VistaCentro vist = new VistaCentro(seleccionado);
+							vist.setModal(true);
+							vist.setLocationRelativeTo(ConsultarCentros.this);
 							vist.setVisible(true);
 						}
 					});
@@ -186,12 +187,12 @@ public class ConsultarCentros extends JDialog {
 								try {
 									btnDelete.setEnabled(true);
 									btnUpdate.setEnabled(true);
-									BolsaLaboral.getInstancia().eliminarCentroTrabajo(seleccionado);
+									servicio.eliminar(seleccionado);
 									cargarCentros();
 								}
 								catch (NotRemovableException ex) {
 									JOptionPane.showMessageDialog(null,ex.getMessage(),"Advertencia",JOptionPane.ERROR_MESSAGE);
-								}	
+								}
 							}
 						}
 					}
@@ -217,38 +218,38 @@ public class ConsultarCentros extends JDialog {
 		cargarCentros();
 		UIUtils.finishDialog(this, getOwner(), 760, 540);
 	}
-	
-	public void filtrar() {
-	    String filtro = txtFiltro.getText().toLowerCase();
-	    modelo.setRowCount(0);
-	    row = new Object[table.getColumnCount()];
-	    
-	    seleccionado = null;
-	    btnDelete.setEnabled(false);
-	    btnUpdate.setEnabled(false);
-	    btnVisualizar.setEnabled(false);
 
-	    for (CentroEmpleador aux : BolsaLaboral.getInstancia().getCentros()) {
-		if (aux == null) {
-			continue;
+	public void filtrar() {
+		String filtro = txtFiltro.getText().toLowerCase();
+		modelo.setRowCount(0);
+		row = new Object[table.getColumnCount()];
+
+		seleccionado = null;
+		btnDelete.setEnabled(false);
+		btnUpdate.setEnabled(false);
+		btnVisualizar.setEnabled(false);
+
+		for (CentroEmpleador aux : BolsaLaboral.getInstancia().getCentros()) {
+			if (aux == null) {
+				continue;
+			}
+			boolean coincide =
+					aux.getCodigo().toLowerCase().contains(filtro) ||
+							aux.getNombre().toLowerCase().contains(filtro) ||
+							aux.getRnc().toLowerCase().contains(filtro) ||
+							aux.getSector().toLowerCase().contains(filtro);
+
+			if (coincide) {
+				row[0] = aux.getCodigo();
+				row[1] = aux.getNombre();
+				row[2] = aux.getRnc();
+				row[3] = aux.getSector();
+				row[4] = UIUtils.valueIcon(aux.getSector());
+				modelo.addRow(row);
+			}
 		}
-	        boolean coincide =
-	            aux.getCodigo().toLowerCase().contains(filtro) ||
-	            aux.getNombre().toLowerCase().contains(filtro) ||
-	            aux.getRnc().toLowerCase().contains(filtro) ||
-	            aux.getSector().toLowerCase().contains(filtro);
-	        
-	        if (coincide) {
-	            row[0] = aux.getCodigo();
-	            row[1] = aux.getNombre();
-	            row[2] = aux.getRnc();
-	            row[3] = aux.getSector();
-		            row[4] = UIUtils.valueIcon(aux.getSector());
-	            modelo.addRow(row);
-	        }
-	    }
 	}
-	
+
 	public static void cargarCentros() {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
@@ -256,11 +257,11 @@ public class ConsultarCentros extends JDialog {
 			if (aux == null) {
 				continue;
 			}
-            row[0] = aux.getCodigo();
-            row[1] = aux.getNombre();
-            row[2] = aux.getRnc();
-            row[3] = aux.getSector();
-	            row[4] = UIUtils.valueIcon(aux.getSector());
+			row[0] = aux.getCodigo();
+			row[1] = aux.getNombre();
+			row[2] = aux.getRnc();
+			row[3] = aux.getSector();
+			row[4] = UIUtils.valueIcon(aux.getSector());
 			modelo.addRow(row);
 		}
 	}

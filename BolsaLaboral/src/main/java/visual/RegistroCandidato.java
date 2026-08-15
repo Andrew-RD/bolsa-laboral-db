@@ -4,6 +4,7 @@ import exception.FormatException;
 import logico.BolsaLaboral;
 import logico.Candidato;
 import logico.ElementoCatalogo;
+import logico.GestionCandidatoService;
 import logico.Obrero;
 import logico.TecnicoSuperior;
 import logico.Universitario;
@@ -46,6 +47,8 @@ public class RegistroCandidato extends JDialog {
     private static final String CARD_UNIVERSITARIO = "universitario";
     private static final String CARD_TECNICO = "tecnico";
     private static final String CARD_OBRERO = "obrero";
+
+    private final GestionCandidatoService servicio = new GestionCandidatoService(BolsaLaboral.getInstancia());
 
     private JTabbedPane contenedor;
     private Candidato candidatoAct;
@@ -493,7 +496,7 @@ public class RegistroCandidato extends JDialog {
                 return;
             }
             if (candidatoAct == null) {
-                BolsaLaboral.getInstancia().registrarCandidato(nuevoCandidato);
+                servicio.registrar(nuevoCandidato);
                 JOptionPane.showMessageDialog(this, "Candidato registrado exitosamente",
                         "Registro Exitoso", JOptionPane.INFORMATION_MESSAGE);
                 limpiar();
@@ -540,7 +543,7 @@ public class RegistroCandidato extends JDialog {
                 } else if (candidatoAct instanceof Obrero && nuevoCandidato instanceof Obrero) {
                     ((Obrero) candidatoAct).setHabilidades(((Obrero) nuevoCandidato).getHabilidades());
                 }
-                BolsaLaboral.getInstancia().modificarCandidato(candidatoAct);
+                servicio.modificar(candidatoAct);
                 advertirLegadosSiCorresponde(cedula);
                 JOptionPane.showMessageDialog(this, "Candidato modificado exitosamente",
                         "Modificación Exitosa", JOptionPane.INFORMATION_MESSAGE);

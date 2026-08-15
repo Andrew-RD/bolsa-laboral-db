@@ -34,17 +34,18 @@ public class ConsultarCandidatos extends JDialog {
 	public static JTable table;
 	public static DefaultTableModel modelo = new DefaultTableModel() {
 		@Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
+		public boolean isCellEditable(int row, int column) {
+			return false;
+		}
 	};
 	public static Object[] row;
+	private final GestionCandidatoService servicio = new GestionCandidatoService(BolsaLaboral.getInstancia());
 	private Candidato seleccionado = null;
 	private JButton btnUpdate;
 	private JButton btnDelete;
 	private JTextField txtFiltro;
 	private JButton btnVisualizar;
-	
+
 	/**
 	 * Create the dialog.
 	 */
@@ -99,7 +100,7 @@ public class ConsultarCandidatos extends JDialog {
 				JLabel lblIconFiltrar = new JLabel("");
 				lblIconFiltrar.setIcon(UIUtils.icon("filtrar.png"));
 				pnlFiltro.add(lblIconFiltrar);
-				
+
 			}
 			{
 				JLabel lblNewLabel = new JLabel("Criterio del Filtro: ");
@@ -136,9 +137,9 @@ public class ConsultarCandidatos extends JDialog {
 						registro.setModal(true);
 						registro.setLocationRelativeTo(ConsultarCandidatos.this);
 						registro.setVisible(true);
-						
+
 						cargarCandidatos();
-						
+
 						seleccionado = null;
 						btnDelete.setEnabled(false);
 						btnUpdate.setEnabled(false);
@@ -178,7 +179,7 @@ public class ConsultarCandidatos extends JDialog {
 							int option = JOptionPane.showConfirmDialog(null, "¿Esta seguro que desea eliminar al candidato " + seleccionado.getNombres() + " " + seleccionado.getApellidos() + " que posee el ID: "+seleccionado.getCodigo()+"?", "Eliminar", JOptionPane.WARNING_MESSAGE);
 							if(option == JOptionPane.OK_OPTION){
 								try {
-									BolsaLaboral.getInstancia().eliminarCandidato(seleccionado);
+									servicio.eliminar(seleccionado);
 									cargarCandidatos();
 									seleccionado = null;
 									btnDelete.setEnabled(false);
@@ -187,7 +188,7 @@ public class ConsultarCandidatos extends JDialog {
 								}
 								catch (NotRemovableException ex) {
 									JOptionPane.showMessageDialog(null,ex.getMessage(),"Advertencia",JOptionPane.ERROR_MESSAGE);
-								}	
+								}
 							}
 						}
 					}
@@ -213,51 +214,51 @@ public class ConsultarCandidatos extends JDialog {
 		cargarCandidatos();
 		UIUtils.finishDialog(this, getOwner(), 720, 540);
 	}
-	
+
 	private void visualizarCandidato(Candidato candidato) {
 		CV visualizar = new CV(candidato);
 		visualizar.setModal(true);
 		visualizar.setLocationRelativeTo(this);
 		visualizar.setVisible(true);
 	}
-	
-	public void filtrar() {
-	    String filtro = txtFiltro.getText().toLowerCase();
-	    modelo.setRowCount(0);
-	    row = new Object[table.getColumnCount()];
-	    
-	    seleccionado = null;
-	    btnDelete.setEnabled(false);
-	    btnUpdate.setEnabled(false);
-	    btnVisualizar.setEnabled(false);
 
-	    for (Candidato aux : BolsaLaboral.getInstancia().getCandidatos()) {
-		if (aux == null) {
-			continue;
+	public void filtrar() {
+		String filtro = txtFiltro.getText().toLowerCase();
+		modelo.setRowCount(0);
+		row = new Object[table.getColumnCount()];
+
+		seleccionado = null;
+		btnDelete.setEnabled(false);
+		btnUpdate.setEnabled(false);
+		btnVisualizar.setEnabled(false);
+
+		for (Candidato aux : BolsaLaboral.getInstancia().getCandidatos()) {
+			if (aux == null) {
+				continue;
+			}
+			boolean coincide =
+					aux.getCodigo().toLowerCase().contains(filtro) ||
+							(aux.getNombres() + " " + aux.getApellidos()).toLowerCase().contains(filtro) ||
+							aux.getIdentificacion().toLowerCase().contains(filtro) ||
+							getNivelAcademico(aux).toLowerCase().contains(filtro) ||
+							aux.getDescripcionEstadoLaboral().toLowerCase().contains(filtro);
+
+			if (coincide) {
+				row[0] = aux.getCodigo();
+				row[1] = aux.getNombres() + " " + aux.getApellidos();
+				row[2] = aux.getIdentificacion();
+				row[3] = getNivelAcademico(aux);
+				row[4] = aux.getDescripcionEstadoLaboral();
+				modelo.addRow(row);
+			}
 		}
-	        boolean coincide =
-	            aux.getCodigo().toLowerCase().contains(filtro) ||
-	            (aux.getNombres() + " " + aux.getApellidos()).toLowerCase().contains(filtro) ||
-	            aux.getIdentificacion().toLowerCase().contains(filtro) ||
-	            getNivelAcademico(aux).toLowerCase().contains(filtro) ||
-	            aux.getDescripcionEstadoLaboral().toLowerCase().contains(filtro);
-	        
-	        if (coincide) {
-	            row[0] = aux.getCodigo();
-	            row[1] = aux.getNombres() + " " + aux.getApellidos();
-	            row[2] = aux.getIdentificacion();
-	            row[3] = getNivelAcademico(aux);
-	            row[4] = aux.getDescripcionEstadoLaboral();
-	            modelo.addRow(row);
-	        }
-	    }
 	}
 
 	private static String getNivelAcademico(Candidato candidato) {
-	    return candidato == null || candidato.getTipoCandidato() == null
-			? "" : candidato.getTipoCandidato().getEtiqueta();
+		return candidato == null || candidato.getTipoCandidato() == null
+				? "" : candidato.getTipoCandidato().getEtiqueta();
 	}
-	
+
 	public static void cargarCandidatos() {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
