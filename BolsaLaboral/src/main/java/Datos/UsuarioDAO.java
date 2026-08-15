@@ -13,16 +13,21 @@ import java.util.ArrayList;
 public class UsuarioDAO {
 
     private static final String SELECT_TODOS =
-            "SELECT id_usuario, nombreCompleto, correo, activo, fechaCreacion, nombre_usuario, contrasena, tipo " +
-                    "FROM usuarios";
+            "SELECT u.id_usuario, u.nombreCompleto, u.correo, " +
+                    "u.activo, u.fechaCreacion, u.nombreUsuario, " +
+                    "u.contrasena, r.nombre AS tipo " + "FROM usuarios u " +
+                    "JOIN roles r " +
+                    "ON r.id_rol = u.id_rol";
 
     private static final String INSERT =
-            "INSERT INTO usuarios (nombreCompleto, correo, activo, nombre_usuario, contrasena, tipo, fechaCreacion) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            "INSERT INTO usuarios " + "(nombreCompleto, correo, activo, nombreUsuario, " +
+                    "contrasena, id_rol, fechaCreacion) " + "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
     private static final String UPDATE =
-            "UPDATE usuarios SET nombreCompleto = ?, correo = ?, activo = ?, nombre_usuario = ?, " +
-                    "contrasena = ?, tipo = ? WHERE id_usuario = ?";
+            "UPDATE usuarios SET " + "nombreCompleto = ?, " + "correo = ?, " + "activo = ?, " +
+                    "nombreUsuario = ?, " + "contrasena = ?, " + "id_rol = ? " + "WHERE id_usuario = ?";
+
+    private static final String SELECT_ID_ROL = "SELECT id_rol FROM roles WHERE nombre = ?";
 
     public ArrayList<Usuario> listarTodos() {
         ArrayList<Usuario> resultado = new ArrayList<>();
@@ -44,7 +49,7 @@ public class UsuarioDAO {
         try (Connection con = Conexion.obtenerConexion();
              PreparedStatement ps = con.prepareStatement(INSERT, Statement.RETURN_GENERATED_KEYS)) {
 
-            vincularDatosBasicos(ps, usuario);
+            vincularDatosBasicos(con, ps, usuario);
             ps.setDate(7, Date.valueOf(usuario.getFechaCreacion()));
             ps.executeUpdate();
 
@@ -67,7 +72,7 @@ public class UsuarioDAO {
         try (Connection con = Conexion.obtenerConexion()) {
             con.setAutoCommit(false);
             try (PreparedStatement ps = con.prepareStatement(UPDATE)) {
-                vincularDatosBasicos(ps, usuario);
+                vincularDatosBasicos(con, ps, usuario);
                 ps.setInt(7, usuario.getIdUsuario());
 
                 int filas = ps.executeUpdate();
@@ -87,19 +92,23 @@ public class UsuarioDAO {
         }
     }
 
-    private void vincularDatosBasicos(PreparedStatement ps, Usuario usuario) throws SQLException {
+    private void vincularDatosBasicos(Connection con, PreparedStatement ps, Usuario usuario) throws SQLException {
         ps.setString(1, usuario.getNombreCompleto());
         ps.setString(2, usuario.getCorreo());
         ps.setBoolean(3, usuario.isActivo());
         ps.setString(4, usuario.getNombreUsuario());
         ps.setString(5, usuario.getContrasena());
-        ps.setString(6, usuario.getTipo());
+        ps.setInt(6, buscarIdRol(con, usuario.getTipo()));
     }
 
     private Usuario mapearUsuario(ResultSet rs) throws SQLException {
-        String nombreUsuario = rs.getString("nombre_usuario");
+        String nombreUsuario = rs.getString("nombreUsuario");
         String contrasena = rs.getString("contrasena");
         String tipo = rs.getString("tipo");
+
+        if("Administrador".equalsIgnoreCase(tipo)) {
+            tipo =  "Admin";
+        }
 
         Usuario usuario = new Usuario(nombreUsuario, contrasena, tipo);
         usuario.setIdUsuario(rs.getInt("id_usuario"));
@@ -113,4 +122,29 @@ public class UsuarioDAO {
         }
         return usuario;
     }
+
+    private int buscarIdRol(
+            Connection con,
+            String tipoUsuario) throws SQLException {
+
+        String nombreRol = tipoUsuario;
+
+        if ("Admin".equalsIgnoreCase(tipoUsuario)) {
+            nombreRol = "Administrador";
+        }
+
+        try (PreparedStatement ps = con.prepareStatement(SELECT_ID_ROL)) {
+            ps.setString(1, nombreRol);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("id_rol");
+                }
+            }
+        }
+
+        throw new SQLException(
+                "No existe el rol '" + nombreRol + "'.");
+    }
+
 }
