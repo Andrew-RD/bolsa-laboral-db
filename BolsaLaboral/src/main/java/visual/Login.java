@@ -2,13 +2,17 @@ package visual;
 
 import Datos.CandidatoDAO;
 import Datos.CentroEmpleadorDAO;
+import Datos.ContratacionDAO;
 import Datos.OfertaLaboralDAO;
+import Datos.SolicitudDAO;
 import Datos.UsuarioDAO;
 import exception.AuthException;
 import logico.BolsaLaboral;
 import logico.CentroEmpleador;
 import logico.OfertaLaboral;
+import logico.Solicitud;
 import logico.Usuario;
+import logico.VacanteCompletada;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -171,6 +175,7 @@ public class Login extends JFrame {
             BolsaLaboral.getInstancia().setCentros(new CentroEmpleadorDAO().listarTodos());
             BolsaLaboral.getInstancia().setCandidatos(new CandidatoDAO().listarTodos());
             cargarOfertasYVincularConCentros();
+            cargarSolicitudesYContrataciones();
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             JOptionPane.showMessageDialog(this,
@@ -191,6 +196,19 @@ public class Login extends JFrame {
             }
         }
         BolsaLaboral.getInstancia().setOfertas(ofertas);
+    }
+
+    private void cargarSolicitudesYContrataciones() {
+        ArrayList<Solicitud> solicitudes = new SolicitudDAO().listarTodos(
+                BolsaLaboral.getInstancia().getCandidatos(),
+                BolsaLaboral.getInstancia().getOfertas());
+        for (Solicitud solicitud : solicitudes) {
+            solicitud.getSolicitante().addSolicitud(solicitud);
+        }
+        BolsaLaboral.getInstancia().setSolicitudes(solicitudes);
+
+        ArrayList<VacanteCompletada> vacantes = new ContratacionDAO().listarTodos(solicitudes);
+        BolsaLaboral.getInstancia().setVacantes(vacantes);
     }
 
     private JLabel fieldLabel(String text) {

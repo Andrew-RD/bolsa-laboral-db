@@ -11,11 +11,13 @@ import java.util.Objects;
 import java.util.Set;
 
 import exception.NotRemovableException;
+import Datos.SolicitudDAO;
+import Datos.ContratacionDAO;
 
 public class BolsaLaboral implements Serializable{
-	
+
 	private static final long serialVersionUID = 1L;
-	
+
 	public static int genCodigoCandidato = 1;
 	public static int genCodigoSolicitud = 1;
 	public static int genCodigoOferta = 1;
@@ -80,7 +82,7 @@ public class BolsaLaboral implements Serializable{
 	public void setVacantes(ArrayList<VacanteCompletada> vacantes) {
 		this.vacantes = vacantes;
 	}
-	
+
 	public ArrayList<Usuario> getUsuarios() {
 		return usuarios;
 	}
@@ -99,7 +101,7 @@ public class BolsaLaboral implements Serializable{
 	public void setCatalogos(CatalogoDatos catalogos) {
 		this.catalogos = catalogos;
 	}
-	
+
 	public Usuario getUsuarioActual() {
 		return usuarioActual;
 	}
@@ -114,7 +116,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return instancia;
 	}
-	
+
 	public static void setInstancia(BolsaLaboral bolsa) {
 		instancia = bolsa;
 	}
@@ -305,7 +307,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return false;
 	}
-	
+
 	public void registrarCentroTrabajo(CentroEmpleador nuevoCentro) {
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CENTROS);
 		if (nuevoCentro == null) {
@@ -315,11 +317,11 @@ public class BolsaLaboral implements Serializable{
 		centros.add(nuevoCentro);
 		genCodigoCentro++;
 	}
-	
+
 	public int buscarIndiceCentroByCodigo(String codigo) {
 		int indice = 0;
 		boolean encontrado = false;
-		
+
 		while(encontrado == false && indice < centros.size()) {
 			CentroEmpleador centro = centros.get(indice);
 			if(centro != null && centro.getCodigo() != null && codigo != null
@@ -330,10 +332,10 @@ public class BolsaLaboral implements Serializable{
 				indice++;
 			}
 		}
-		
+
 		return encontrado ? indice : -1;
 	}
-	
+
 	public boolean modificarCentroTrabajo(CentroEmpleador centroModificar) {
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CENTROS);
 		if (centroModificar == null) {
@@ -348,7 +350,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return false;
 	}
-	
+
 	public void eliminarCentroTrabajo(CentroEmpleador centroEliminar) throws NotRemovableException{
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CENTROS);
 		if(centroEliminable(centroEliminar)) {
@@ -358,7 +360,7 @@ public class BolsaLaboral implements Serializable{
 			throw new NotRemovableException("El centro de trabajo no puede ser eliminado ya que posee ofertas existentes.");
 		}
 	}
-	
+
 	public void registrarCandidato(Candidato nuevoCandidato) {
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CANDIDATOS);
 		if (nuevoCandidato == null) {
@@ -390,7 +392,7 @@ public class BolsaLaboral implements Serializable{
 		candidatos.set(indice, candidatoModificar);
 		return true;
 	}
-	
+
 	public void eliminarCandidato(Candidato candidatoEliminar) throws NotRemovableException{
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_CANDIDATOS);
 		if(candidatoEliminable(candidatoEliminar)) {
@@ -400,7 +402,7 @@ public class BolsaLaboral implements Serializable{
 			throw new NotRemovableException("El candidato no puede ser eliminado ya que esta vinculado con una solicitud.");
 		}
 	}
-	
+
 	public Candidato buscarCandidatoByCodigo(String codigo) {
 		Candidato encontrado = null;
 		int indice = 0;
@@ -413,7 +415,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return encontrado;
 	}
-	
+
 	public CentroEmpleador buscarCentroByCodigo(String codigo) {
 		CentroEmpleador encontrado = null;
 		int indice = 0;
@@ -426,7 +428,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return encontrado;
 	}
-	
+
 	public ArrayList<ResultadoMatcheo> obtenerCandidatosOrdenadosParaOferta(OfertaLaboral oferta) {
 		ArrayList<ResultadoMatcheo> ordenados = new ArrayList<ResultadoMatcheo>();
 		for (Candidato candidato : candidatos) {
@@ -447,104 +449,104 @@ public class BolsaLaboral implements Serializable{
 		return ordenados;
 	}
 
-	
-	private int calcularPuntaje(Candidato candidato, OfertaLaboral oferta) {
-	    int puntaje = 0;
-	    
-	    if (candidato.getModalidad().equalsIgnoreCase(oferta.getModalidad())) {
-	        puntaje += 10;
-	    }
-	    
-	    if (candidato.getJornada().equalsIgnoreCase(oferta.getJornada())) {
-	        puntaje += 10;
-	    }
-	    
-	    if (candidato.getAreaDeInteres().equalsIgnoreCase(oferta.getArea())) {
-	        puntaje += 20;
-	    }
-	    
-	    if (candidato.getProvincia().equalsIgnoreCase(oferta.getOfertador().getProvincia())) {
-	        puntaje += 10;
-	    } else if (candidato.isDisposicionMudarse() || oferta.isOfreceReubicacion()) {
-	        puntaje += 5;
-	    }
-	    
-	    if (candidato.getAspiracionSalarial() <= oferta.getSalario()) {
-	        puntaje += 10;
-	    } else {
-	        float exceso = candidato.getAspiracionSalarial() - oferta.getSalario();
-	        float porcentajeExceso = exceso / oferta.getSalario();
 
-	        if (porcentajeExceso <= 0.35f) {
-	            puntaje += Math.round(10 * (1 - porcentajeExceso / 0.35f));
-	        }
-	    }
-	    
-	    int idiomasRequeridos = oferta.getCantIdiomas();
-	    int idiomasPuntos = 0;
-	    for (String idioma : oferta.getIdiomasRequeridas()) {
-	        if (candidato.getIdiomas().contains(idioma)) {
-	            idiomasPuntos++;
-	        }
-	    }
-	    
-	    puntaje += Math.min(10, (idiomasPuntos*10)/Math.max(1, idiomasRequeridos));
-	    
-	    TipoCandidato tipoRequerido = oferta.getTipoCandidatoRequerido();
-	    if (candidato.getTipoCandidato() == TipoCandidato.UNIVERSITARIO
-			&& tipoRequerido == TipoCandidato.UNIVERSITARIO) {
-		Universitario u = (Universitario) candidato;
-		puntaje += 5;
-		if(!oferta.getRequisitos().isEmpty()
-				&& Objects.equals(u.getCarrera(), oferta.getRequisitos().get(0))) {
-			puntaje += 15;
+	private int calcularPuntaje(Candidato candidato, OfertaLaboral oferta) {
+		int puntaje = 0;
+
+		if (candidato.getModalidad().equalsIgnoreCase(oferta.getModalidad())) {
+			puntaje += 10;
 		}
-	    } else if (candidato.getTipoCandidato() == TipoCandidato.TECNICO
-			&& tipoRequerido == TipoCandidato.TECNICO) {
-	        TecnicoSuperior t = (TecnicoSuperior) candidato;
-	        puntaje += 5;
-	        if(!oferta.getRequisitos().isEmpty()
-			&& Objects.equals(t.getAreaTecnica(), oferta.getRequisitos().get(0))) {
-		puntaje += 10;
-	        }
-	        if (t.getAniosExperiencia() >= oferta.getExperienciaMinima()) {
-	            puntaje += 5;
-	        }
-	    } else if (candidato.getTipoCandidato() == TipoCandidato.OBRERO
-			&& tipoRequerido == TipoCandidato.OBRERO) {
-	        Obrero o = (Obrero) candidato;
-	        puntaje += 10;
-	        int habilidadPuntos = 0;
-	        int habilidadesRequeridas = oferta.getCantRequisitos();
-	        for (String habilidad : oferta.getRequisitos()) {
-	            if (o.getHabilidades().contains(habilidad)) {
-	                habilidadPuntos++;
-	            }
-	        }
-	        puntaje+= Math.min(10, (habilidadPuntos*10)/Math.max(1, habilidadesRequeridas));
-	    }
-	    
-	    if (oferta.isobligatorioLicencia()) {
-	        if (candidato.isLicenciaConducir()) {
-	            puntaje += 5;
-	        } else {
-	            puntaje -= 20;
-	        }
-	    } else if (candidato.isLicenciaConducir()) {
-	        puntaje += 2;
-	    }
-	    
-	    if(oferta.isObligatorioMayorDeEdad()) {
+
+		if (candidato.getJornada().equalsIgnoreCase(oferta.getJornada())) {
+			puntaje += 10;
+		}
+
+		if (candidato.getAreaDeInteres().equalsIgnoreCase(oferta.getArea())) {
+			puntaje += 20;
+		}
+
+		if (candidato.getProvincia().equalsIgnoreCase(oferta.getOfertador().getProvincia())) {
+			puntaje += 10;
+		} else if (candidato.isDisposicionMudarse() || oferta.isOfreceReubicacion()) {
+			puntaje += 5;
+		}
+
+		if (candidato.getAspiracionSalarial() <= oferta.getSalario()) {
+			puntaje += 10;
+		} else {
+			float exceso = candidato.getAspiracionSalarial() - oferta.getSalario();
+			float porcentajeExceso = exceso / oferta.getSalario();
+
+			if (porcentajeExceso <= 0.35f) {
+				puntaje += Math.round(10 * (1 - porcentajeExceso / 0.35f));
+			}
+		}
+
+		int idiomasRequeridos = oferta.getCantIdiomas();
+		int idiomasPuntos = 0;
+		for (String idioma : oferta.getIdiomasRequeridas()) {
+			if (candidato.getIdiomas().contains(idioma)) {
+				idiomasPuntos++;
+			}
+		}
+
+		puntaje += Math.min(10, (idiomasPuntos*10)/Math.max(1, idiomasRequeridos));
+
+		TipoCandidato tipoRequerido = oferta.getTipoCandidatoRequerido();
+		if (candidato.getTipoCandidato() == TipoCandidato.UNIVERSITARIO
+				&& tipoRequerido == TipoCandidato.UNIVERSITARIO) {
+			Universitario u = (Universitario) candidato;
+			puntaje += 5;
+			if(!oferta.getRequisitos().isEmpty()
+					&& Objects.equals(u.getCarrera(), oferta.getRequisitos().get(0))) {
+				puntaje += 15;
+			}
+		} else if (candidato.getTipoCandidato() == TipoCandidato.TECNICO
+				&& tipoRequerido == TipoCandidato.TECNICO) {
+			TecnicoSuperior t = (TecnicoSuperior) candidato;
+			puntaje += 5;
+			if(!oferta.getRequisitos().isEmpty()
+					&& Objects.equals(t.getAreaTecnica(), oferta.getRequisitos().get(0))) {
+				puntaje += 10;
+			}
+			if (t.getAniosExperiencia() >= oferta.getExperienciaMinima()) {
+				puntaje += 5;
+			}
+		} else if (candidato.getTipoCandidato() == TipoCandidato.OBRERO
+				&& tipoRequerido == TipoCandidato.OBRERO) {
+			Obrero o = (Obrero) candidato;
+			puntaje += 10;
+			int habilidadPuntos = 0;
+			int habilidadesRequeridas = oferta.getCantRequisitos();
+			for (String habilidad : oferta.getRequisitos()) {
+				if (o.getHabilidades().contains(habilidad)) {
+					habilidadPuntos++;
+				}
+			}
+			puntaje+= Math.min(10, (habilidadPuntos*10)/Math.max(1, habilidadesRequeridas));
+		}
+
+		if (oferta.isobligatorioLicencia()) {
+			if (candidato.isLicenciaConducir()) {
+				puntaje += 5;
+			} else {
+				puntaje -= 20;
+			}
+		} else if (candidato.isLicenciaConducir()) {
+			puntaje += 2;
+		}
+
+		if(oferta.isObligatorioMayorDeEdad()) {
 			if(candidato.getEdad() >= 18) {
 				puntaje += 5;
 			} else {
 				puntaje -= 25;
 			}
-	    } else {
+		} else {
 			puntaje += 5;
-	    }
-	    
-	    return Math.max(0, puntaje);
+		}
+
+		return Math.max(0, puntaje);
 	}
 
 	public void eliminarOfertaTrabajo(OfertaLaboral seleccionado) throws NotRemovableException{
@@ -557,7 +559,7 @@ public class BolsaLaboral implements Serializable{
 			throw new NotRemovableException("La oferta no es eliminable ya que esta vinculada con una solicitud.");
 		}
 	}
-	
+
 	public OfertaLaboral buscarOfertaByCodigo(String codigo) {
 		OfertaLaboral encontrado = null;
 		int indice = 0;
@@ -570,11 +572,11 @@ public class BolsaLaboral implements Serializable{
 		}
 		return encontrado;
 	}
-	
+
 	public int buscarIndiceOfertaByCodigo(String codigo) {
 		int indice = 0;
 		boolean encontrado = false;
-		
+
 		while(encontrado == false && indice < ofertas.size()) {
 			OfertaLaboral oferta = ofertas.get(indice);
 			if(oferta != null && oferta.getCodigo() != null && codigo != null
@@ -585,10 +587,10 @@ public class BolsaLaboral implements Serializable{
 				indice++;
 			}
 		}
-		
+
 		return encontrado ? indice : -1;
 	}
-	
+
 	public void registrarOfertaLaboral(OfertaLaboral nuevaOferta) {
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_OFERTAS);
 		if (nuevaOferta == null || nuevaOferta.getOfertador() == null) {
@@ -599,7 +601,7 @@ public class BolsaLaboral implements Serializable{
 		nuevaOferta.getOfertador().getOfertasLaborales().add(nuevaOferta);
 		genCodigoOferta++;
 	}
-	
+
 	public boolean modificarOfertaLaboral(OfertaLaboral ofertaModificar) {
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.GESTIONAR_OFERTAS);
 		if (ofertaModificar == null) {
@@ -627,7 +629,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return aux;
 	}
-	
+
 	public void regVacanteCompletada(Solicitud solicitudContratada) {
 		contratarCandidato(solicitudContratada);
 	}
@@ -652,21 +654,21 @@ public class BolsaLaboral implements Serializable{
 		}
 		return null;
 	}
-	
+
 	public boolean centroEliminable(CentroEmpleador centro) {
 		if(centro.getOfertasLaborales().size() != 0) {
 			return false;
 		}
 		return true;
 	}
-	
+
 	public boolean candidatoEliminable(Candidato candidato) {
 		if(candidato.getMisSolicitudes().size() != 0) {
 			return false;
 		}
 		return true;
 	}
-	
+
 	private boolean ofertaEliminable(OfertaLaboral seleccionado) {
 		boolean aux = true;
 		for(Solicitud sol : solicitudes) {
@@ -676,7 +678,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return aux;
 	}
-	
+
 	public ArrayList<OfertaLaboral> ofertasDisponibles(){
 		ArrayList<OfertaLaboral> ofertasDisponibles = new ArrayList<>();
 		for(OfertaLaboral ofr: ofertas) {
@@ -690,7 +692,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return ofertasDisponibles;
 	}
-	
+
 	public ArrayList<ResultadoMatcheo> procesamientoAvanzando(){
 		AutorizacionService.exigirPermiso(usuarioActual, Permiso.USAR_PROCESAMIENTO_AVANZADO);
 		ArrayList<ResultadoMatcheo> resultados = new ArrayList<>();
@@ -699,25 +701,25 @@ public class BolsaLaboral implements Serializable{
 				resultados.addAll(obtenerCandidatosOrdenadosParaOferta(ofr));
 			}
 		}
-		
+
 		return resultados;
 	}
-	
-	public String obtenerCondicion(int puntaje, int limitePuntaje) {
-	    double noRecomendadoMax = Math.max(Math.min(limitePuntaje * 1.3, 65), 50);
-	    double aceptableMax = Math.max(Math.min(limitePuntaje * 1.6, 85), 65);
 
-	    if (puntaje < noRecomendadoMax) {
-	        return "No recomendado";
-	    } else if (puntaje < aceptableMax) {
-	        return "Aceptable";
-	    } 
-	    return "Recomendado";
+	public String obtenerCondicion(int puntaje, int limitePuntaje) {
+		double noRecomendadoMax = Math.max(Math.min(limitePuntaje * 1.3, 65), 50);
+		double aceptableMax = Math.max(Math.min(limitePuntaje * 1.6, 85), 65);
+
+		if (puntaje < noRecomendadoMax) {
+			return "No recomendado";
+		} else if (puntaje < aceptableMax) {
+			return "Aceptable";
+		}
+		return "Recomendado";
 	}
-	
+
 	public ResultadoMatcheo buscarResultado(ArrayList<ResultadoMatcheo> resultados, String codigoOferta, String codigoCandidato) {
 		ResultadoMatcheo resultado = null;
-		
+
 		int indice = 0;
 		while(indice < resultados.size() && resultado == null) {
 			if(resultados.get(indice).getOferta().getCodigo().equals(codigoOferta) && resultados.get(indice).getSolicitante().getCodigo().equals(codigoCandidato)) {
@@ -737,18 +739,18 @@ public class BolsaLaboral implements Serializable{
 		if (!decision.isPermitido()) {
 			return false;
 		}
-		Solicitud sol = new Solicitud("SOL-" + genCodigoSolicitud, LocalDate.now(),
+		Solicitud sol = new Solicitud(null, LocalDate.now(),
 				Solicitud.ESTADO_ENVIADA, resMatchSelec.getSolicitante(), resMatchSelec.getOferta());
 		if (!verificarSolicitud(sol)) {
 			return false;
 		}
+		new SolicitudDAO().agregar(sol);
 		solicitudes.add(sol);
 		resMatchSelec.getSolicitante().addSolicitud(sol);
 		resMatchSelec.getSolicitante().actualizarEstadoLaboral();
-		genCodigoSolicitud++;
 		return true;
 	}
-	
+
 	public boolean verificarSolicitud(Solicitud solicitud) {
 		if (solicitud == null) {
 			return false;
@@ -764,7 +766,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		return true;
 	}
-	
+
 	public boolean matchSolicitud(Solicitud s1, Solicitud s2) {
 		if (s1 == null || s2 == null) {
 			return false;
@@ -784,18 +786,18 @@ public class BolsaLaboral implements Serializable{
 		OfertaLaboral oferta = solicitud.getOfertaSolicitada();
 		Candidato candidato = solicitud.getSolicitante();
 		solicitud.setEstado(Solicitud.ESTADO_APROBADA);
+		new SolicitudDAO().actualizarEstado(solicitud, LocalDate.now());
 		if (candidato.getMisSolicitudes() == null || !candidato.getMisSolicitudes().contains(solicitud)) {
 			candidato.addSolicitud(solicitud);
 		}
 		candidato.cambiarEstadoSolicitudesAEmpleado();
 
-		VacanteCompletada vacante = new VacanteCompletada("VAC-" + genCodigoVacanteCompletada,
-				solicitud, oferta, LocalDate.now());
+		VacanteCompletada vacante = new VacanteCompletada(null, solicitud, oferta, LocalDate.now());
+		new ContratacionDAO().agregar(vacante);
 		if (vacantes == null) {
 			vacantes = new ArrayList<VacanteCompletada>();
 		}
 		vacantes.add(vacante);
-		genCodigoVacanteCompletada++;
 		oferta.sincronizarVacantesOcupadas(contarVacantesOcupadas(oferta));
 		return true;
 	}
@@ -806,6 +808,7 @@ public class BolsaLaboral implements Serializable{
 			return;
 		}
 		solicitud.setEstado(Solicitud.ESTADO_RECHAZADA);
+		new SolicitudDAO().actualizarEstado(solicitud, LocalDate.now());
 		Candidato candidato = solicitud.getSolicitante();
 		if (candidato != null) {
 			if (candidato.getMisSolicitudes() == null || !candidato.getMisSolicitudes().contains(solicitud)) {
@@ -1042,7 +1045,7 @@ public class BolsaLaboral implements Serializable{
 		return izquierda != null && derecha != null && izquierda.getCodigo() != null
 				&& izquierda.getCodigo().equals(derecha.getCodigo());
 	}
-	
+
 	public ArrayList<Solicitud> obtenerSolicitudesVinculadas(OfertaLaboral oferta){
 		ArrayList<Solicitud> solicitudesV = new ArrayList<Solicitud>();
 		if (oferta == null) {
@@ -1054,10 +1057,10 @@ public class BolsaLaboral implements Serializable{
 				solicitudesV.add(sol);
 			}
 		}
-			
+
 		return solicitudesV;
 	}
-	
+
 	public int calcularTasaCovertura() {
 		long puestosOcupados = 0;
 		long puestosTotales = 0;
@@ -1098,7 +1101,7 @@ public class BolsaLaboral implements Serializable{
 				continue;
 			}
 			boolean encontrado = false;
-			
+
 			int indice = 0;
 			while(indice < solicitudes.size() && encontrado == false) {
 				Solicitud solicitud = solicitudes.get(indice);
@@ -1109,12 +1112,12 @@ public class BolsaLaboral implements Serializable{
 					indice++;
 				}
 			}
-			
+
 			if(encontrado == false) {
 				cantidad++;
 			}
 		}
-		
+
 		return cantidad;
 	}
 }

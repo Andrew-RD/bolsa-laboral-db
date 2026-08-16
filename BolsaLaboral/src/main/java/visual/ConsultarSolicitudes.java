@@ -31,10 +31,10 @@ public class ConsultarSolicitudes extends JDialog {
 	public static JTable table;
 	public static DefaultTableModel modelo = new DefaultTableModel() {
 		@Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-		
+		public boolean isCellEditable(int row, int column) {
+			return false;
+		}
+
 		public Class getColumnClass(int column) {
 			Object value = getRowCount() == 0 ? null : getValueAt(0, column);
 			return value == null ? Object.class : value.getClass();
@@ -45,7 +45,7 @@ public class ConsultarSolicitudes extends JDialog {
 	private JTextField txtFiltro;
 	private JButton btnContratar;
 	private JButton btnRechazar;
-	
+
 	/**
 	 * Create the dialog.
 	 */
@@ -101,7 +101,7 @@ public class ConsultarSolicitudes extends JDialog {
 				JLabel lblIconFiltrar = new JLabel("");
 				lblIconFiltrar.setIcon(UIUtils.icon("filtrar.png"));
 				pnlFiltro.add(lblIconFiltrar);
-				
+
 			}
 			{
 				JLabel lblNewLabel = new JLabel("Criterio del Filtro: ");
@@ -145,7 +145,7 @@ public class ConsultarSolicitudes extends JDialog {
 											"Solo se puede aprobar una solicitud Enviada cuya oferta tenga vacantes disponibles.",
 											"Advertencia", JOptionPane.WARNING_MESSAGE);
 								}
-							} catch (SecurityException exception) {
+							} catch (RuntimeException exception) {
 								JOptionPane.showMessageDialog(ConsultarSolicitudes.this,
 										exception.getMessage(), "Acción no autorizada",
 										JOptionPane.WARNING_MESSAGE);
@@ -158,11 +158,11 @@ public class ConsultarSolicitudes extends JDialog {
 							public void actionPerformed(ActionEvent e) {
 								if(seleccionado != null && BolsaLaboral.getInstancia().esProcesable(seleccionado)) {
 									try {
-									BolsaLaboral.getInstancia().rechazarCandidato(seleccionado);
-									JOptionPane.showMessageDialog(ConsultarSolicitudes.this,"Rechazo procesado satisfactoriamente.","Información",JOptionPane.INFORMATION_MESSAGE);
-									cargarSolicitudes();
-									filtrar();
-									} catch (SecurityException exception) {
+										BolsaLaboral.getInstancia().rechazarCandidato(seleccionado);
+										JOptionPane.showMessageDialog(ConsultarSolicitudes.this,"Rechazo procesado satisfactoriamente.","Información",JOptionPane.INFORMATION_MESSAGE);
+										cargarSolicitudes();
+										filtrar();
+									} catch (RuntimeException exception) {
 										JOptionPane.showMessageDialog(ConsultarSolicitudes.this,
 												exception.getMessage(), "Acción no autorizada",
 												JOptionPane.WARNING_MESSAGE);
@@ -206,40 +206,40 @@ public class ConsultarSolicitudes extends JDialog {
 		cargarSolicitudes();
 		UIUtils.finishDialog(this, getOwner(), 820, 540);
 	}
-	
+
 	public void filtrar() {
-	    String filtro = txtFiltro.getText().toLowerCase();
-	    modelo.setRowCount(0);
-	    row = new Object[table.getColumnCount()];
-	    
-	    seleccionado = null;
-	    btnContratar.setEnabled(false);
-	    btnRechazar.setEnabled(false);
-	    
-	    for (Solicitud aux : BolsaLaboral.getInstancia().getSolicitudes()) {
-		if (aux == null || aux.getSolicitante() == null
-				|| aux.getOfertaSolicitada() == null
-				|| aux.getOfertaSolicitada().getOfertador() == null) {
-			continue;
+		String filtro = txtFiltro.getText().toLowerCase();
+		modelo.setRowCount(0);
+		row = new Object[table.getColumnCount()];
+
+		seleccionado = null;
+		btnContratar.setEnabled(false);
+		btnRechazar.setEnabled(false);
+
+		for (Solicitud aux : BolsaLaboral.getInstancia().getSolicitudes()) {
+			if (aux == null || aux.getSolicitante() == null
+					|| aux.getOfertaSolicitada() == null
+					|| aux.getOfertaSolicitada().getOfertador() == null) {
+				continue;
+			}
+			String estado = aux.getEstado() == null ? "" : aux.getEstado();
+			boolean coincide =
+					aux.getCodigo().toLowerCase().contains(filtro) ||
+							aux.getOfertaSolicitada().getPuesto().toLowerCase().contains(filtro) ||
+							aux.getOfertaSolicitada().getOfertador().getNombre().toLowerCase().contains(filtro) ||
+							(aux.getSolicitante().getNombres() + aux.getSolicitante().getApellidos()).toLowerCase().contains(filtro) ||
+							estado.toLowerCase().contains(filtro);
+
+			if (coincide) {
+				row[0] = aux.getCodigo();
+				row[1] = aux.getSolicitante().getNombres() + " " + aux.getSolicitante().getApellidos();
+				row[2] = aux.getOfertaSolicitada().getPuesto();
+				row[3] = aux.getOfertaSolicitada().getOfertador().getNombre();
+				row[4] = aux.getEstado();
+
+				modelo.addRow(row);
+			}
 		}
-		String estado = aux.getEstado() == null ? "" : aux.getEstado();
-	        boolean coincide =
-	            aux.getCodigo().toLowerCase().contains(filtro) ||
-	            aux.getOfertaSolicitada().getPuesto().toLowerCase().contains(filtro) ||
-	            aux.getOfertaSolicitada().getOfertador().getNombre().toLowerCase().contains(filtro) ||
-	            (aux.getSolicitante().getNombres() + aux.getSolicitante().getApellidos()).toLowerCase().contains(filtro) ||
-	            estado.toLowerCase().contains(filtro);
-	        
-	        if (coincide) {
-	            row[0] = aux.getCodigo();
-	            row[1] = aux.getSolicitante().getNombres() + " " + aux.getSolicitante().getApellidos();
-	            row[2] = aux.getOfertaSolicitada().getPuesto();
-	            row[3] = aux.getOfertaSolicitada().getOfertador().getNombre();
-	            row[4] = aux.getEstado();
-	            
-	            modelo.addRow(row);
-	        }
-	    }
 	}
 
 	public static void cargarSolicitudes() {
@@ -251,11 +251,11 @@ public class ConsultarSolicitudes extends JDialog {
 					|| aux.getOfertaSolicitada().getOfertador() == null) {
 				continue;
 			}
-            row[0] = aux.getCodigo();
-            row[1] = aux.getSolicitante().getNombres() + " " + aux.getSolicitante().getApellidos();
-            row[2] = aux.getOfertaSolicitada().getPuesto();
-            row[3] = aux.getOfertaSolicitada().getOfertador().getNombre();
-            row[4] = aux.getEstado();
+			row[0] = aux.getCodigo();
+			row[1] = aux.getSolicitante().getNombres() + " " + aux.getSolicitante().getApellidos();
+			row[2] = aux.getOfertaSolicitada().getPuesto();
+			row[3] = aux.getOfertaSolicitada().getOfertador().getNombre();
+			row[4] = aux.getEstado();
 			modelo.addRow(row);
 		}
 	}
