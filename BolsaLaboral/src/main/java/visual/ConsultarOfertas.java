@@ -35,16 +35,17 @@ public class ConsultarOfertas extends JDialog {
 	public static JTable table;
 	public static DefaultTableModel modelo = new DefaultTableModel() {
 		@Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-		
+		public boolean isCellEditable(int row, int column) {
+			return false;
+		}
+
 		public Class getColumnClass(int column) {
 			Object value = getRowCount() == 0 ? null : getValueAt(0, column);
 			return value == null ? Object.class : value.getClass();
 		}
 	};
 	public static Object[] row;
+	private final GestionOfertaService servicio = new GestionOfertaService(BolsaLaboral.getInstancia());
 	private OfertaLaboral seleccionado = null;
 	private JButton btnUpdate;
 	private JButton btnDelete;
@@ -52,7 +53,7 @@ public class ConsultarOfertas extends JDialog {
 	private JButton btnVincular;
 	private JButton btnVerInforme;
 	private JLabel lblRazonProcesamiento;
-	
+
 	/**
 	 * Create the dialog.
 	 */
@@ -104,7 +105,7 @@ public class ConsultarOfertas extends JDialog {
 				JLabel lblIconFiltrar = new JLabel("");
 				lblIconFiltrar.setIcon(UIUtils.icon("filtrar.png"));
 				pnlFiltro.add(lblIconFiltrar);
-				
+
 			}
 			{
 				JLabel lblNewLabel = new JLabel("Criterio del Filtro: ");
@@ -215,15 +216,23 @@ public class ConsultarOfertas extends JDialog {
 				btnDelete.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						if(seleccionado != null) {
-							int option = JOptionPane.showConfirmDialog(null, "¿Esta seguro que desea eliminar la oferta al puesto de " + seleccionado.getPuesto() + " que posee el ID: "+seleccionado.getCodigo()+"?", "Eliminar", JOptionPane.WARNING_MESSAGE);
+							int cantidadSolicitudes = servicio.contarSolicitudesVinculadas(seleccionado);
+							String mensaje = "¿Esta seguro que desea eliminar la oferta al puesto de "
+									+ seleccionado.getPuesto() + " que posee el ID: " + seleccionado.getCodigo() + "?";
+							if (cantidadSolicitudes > 0) {
+								mensaje += "\n\nEsta oferta tiene " + cantidadSolicitudes
+										+ (cantidadSolicitudes == 1 ? " solicitud registrada" : " solicitudes registradas")
+										+ ". Si continúa, también se eliminarán esas solicitudes y las contrataciones asociadas a ellas.";
+							}
+							int option = JOptionPane.showConfirmDialog(null, mensaje, "Eliminar", JOptionPane.WARNING_MESSAGE);
 							if(option == JOptionPane.OK_OPTION){
 								try {
-									BolsaLaboral.getInstancia().eliminarOfertaTrabajo(seleccionado);
+									servicio.eliminar(seleccionado);
 									cargarOfertas();
 								}
 								catch (NotRemovableException | SecurityException ex) {
 									JOptionPane.showMessageDialog(null,ex.getMessage(),"Advertencia",JOptionPane.ERROR_MESSAGE);
-								}	
+								}
 							}
 						}
 					}
@@ -250,41 +259,41 @@ public class ConsultarOfertas extends JDialog {
 		actualizarBotones();
 		UIUtils.finishDialog(this, getOwner(), 920, 540);
 	}
-	
+
 	public void filtrar() {
-	    String filtro = txtFiltro.getText().toLowerCase();
-	    modelo.setRowCount(0);
-	    row = new Object[table.getColumnCount()];
-	    
-	    seleccionado = null;
-	    btnDelete.setEnabled(false);
-	    btnUpdate.setEnabled(false);
-	    btnVincular.setEnabled(false);
-	    btnVerInforme.setEnabled(false);
-	    btnVincular.setToolTipText("Debe seleccionar una oferta.");
-	    actualizarRazonProcesamiento(
+		String filtro = txtFiltro.getText().toLowerCase();
+		modelo.setRowCount(0);
+		row = new Object[table.getColumnCount()];
+
+		seleccionado = null;
+		btnDelete.setEnabled(false);
+		btnUpdate.setEnabled(false);
+		btnVincular.setEnabled(false);
+		btnVerInforme.setEnabled(false);
+		btnVincular.setToolTipText("Debe seleccionar una oferta.");
+		actualizarRazonProcesamiento(
 				BolsaLaboral.getInstancia().evaluarProcesamiento(null));
 
-	    for (OfertaLaboral aux : BolsaLaboral.getInstancia().getOfertas()) {
-		if (aux == null || aux.getOfertador() == null) {
-			continue;
+		for (OfertaLaboral aux : BolsaLaboral.getInstancia().getOfertas()) {
+			if (aux == null || aux.getOfertador() == null) {
+				continue;
+			}
+			boolean coincide =
+					aux.getCodigo().toLowerCase().contains(filtro) ||
+							aux.getOfertador().getNombre().toLowerCase().contains(filtro) ||
+							aux.getPuesto().toLowerCase().contains(filtro) ||
+							aux.getArea().toLowerCase().contains(filtro) ||
+							aux.getEstado().toLowerCase().contains(filtro);
+
+			if (coincide) {
+				row[0] = aux.getCodigo();
+				row[1] = aux.getPuesto();
+				row[2] = aux.getOfertador().getNombre();
+				row[3] = UIUtils.valueIcon(aux.getArea());
+				row[4] = aux.getEstado();
+				modelo.addRow(row);
+			}
 		}
-	        boolean coincide =
-	            aux.getCodigo().toLowerCase().contains(filtro) ||
-	            aux.getOfertador().getNombre().toLowerCase().contains(filtro) ||
-	            aux.getPuesto().toLowerCase().contains(filtro) ||
-	            aux.getArea().toLowerCase().contains(filtro) ||
-	            aux.getEstado().toLowerCase().contains(filtro);
-	        
-	        if (coincide) {
-	            row[0] = aux.getCodigo();
-	            row[1] = aux.getPuesto();
-	            row[2] = aux.getOfertador().getNombre();
-	            row[3] = UIUtils.valueIcon(aux.getArea());
-	            row[4] = aux.getEstado();
-	            modelo.addRow(row);
-	        }
-	    }
 	}
 
 	private void actualizarBotones() {
@@ -314,7 +323,7 @@ public class ConsultarOfertas extends JDialog {
 			lblRazonProcesamiento.setToolTipText(decision.getRazon());
 		}
 	}
-	
+
 	public static void cargarOfertas() {
 		modelo.setRowCount(0);
 		row = new Object[table.getColumnCount()];
@@ -322,11 +331,11 @@ public class ConsultarOfertas extends JDialog {
 			if (aux == null || aux.getOfertador() == null) {
 				continue;
 			}
-            row[0] = aux.getCodigo();
-            row[1] = aux.getPuesto();
-            row[2] = aux.getOfertador().getNombre();
-	            row[3] = UIUtils.valueIcon(aux.getArea());
-            row[4] = aux.getEstado();
+			row[0] = aux.getCodigo();
+			row[1] = aux.getPuesto();
+			row[2] = aux.getOfertador().getNombre();
+			row[3] = UIUtils.valueIcon(aux.getArea());
+			row[4] = aux.getEstado();
 			modelo.addRow(row);
 		}
 	}

@@ -3,6 +3,7 @@ package visual;
 import exception.FormatException;
 import logico.BolsaLaboral;
 import logico.CentroEmpleador;
+import logico.GestionOfertaService;
 import logico.OfertaLaboral;
 import logico.AutorizacionService;
 import logico.Permiso;
@@ -38,6 +39,8 @@ public class RegistroOfertaLaboral extends JDialog {
     private static final String CARD_UNIVERSITARIO = "universitario";
     private static final String CARD_TECNICO = "tecnico";
     private static final String CARD_OBRERO = "obrero";
+
+    private final GestionOfertaService servicio = new GestionOfertaService(BolsaLaboral.getInstancia());
 
     private OfertaLaboral ofertaAct;
     private JTextField txtCodigo;
@@ -392,13 +395,14 @@ public class RegistroOfertaLaboral extends JDialog {
             ofertaAct.agregarRequisito(cmbHabilidad.getSelectedItem().toString());
         }
 
-        if (BolsaLaboral.getInstancia().modificarOfertaLaboral(ofertaAct)) {
+        try {
+            servicio.modificar(ofertaAct);
             JOptionPane.showMessageDialog(this,
                     "La oferta: " + txtPuesto.getText() + " ha sido modificada exitosamente.",
                     "Información", JOptionPane.INFORMATION_MESSAGE);
             ConsultarOfertas.cargarOfertas();
             dispose();
-        } else {
+        } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this,
                     "La oferta " + txtPuesto.getText() + " no logró ser modificada.");
         }
@@ -442,7 +446,7 @@ public class RegistroOfertaLaboral extends JDialog {
                 tipoCandidato.getEtiqueta(), requisitos, idiomas,
                 ((Number) spnPorcentaje.getValue()).intValue());
         nuevaOferta.setTipoCandidatoRequerido(tipoCandidato);
-        BolsaLaboral.getInstancia().registrarOfertaLaboral(nuevaOferta);
+        servicio.registrar(nuevaOferta);
         JOptionPane.showMessageDialog(this, "La oferta laboral ha sido agregado correctamente.",
                 "Información", JOptionPane.INFORMATION_MESSAGE);
         txtCodigo.setText("OFR-" + BolsaLaboral.genCodigoOferta);

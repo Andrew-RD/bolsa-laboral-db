@@ -2,9 +2,12 @@ package visual;
 
 import Datos.CandidatoDAO;
 import Datos.CentroEmpleadorDAO;
+import Datos.OfertaLaboralDAO;
 import Datos.UsuarioDAO;
 import exception.AuthException;
 import logico.BolsaLaboral;
+import logico.CentroEmpleador;
+import logico.OfertaLaboral;
 import logico.Usuario;
 
 import javax.swing.JButton;
@@ -26,6 +29,7 @@ import java.awt.GridBagLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Arrays;
+import java.util.ArrayList;
 
 public class Login extends JFrame {
 
@@ -166,12 +170,27 @@ public class Login extends JFrame {
             BolsaLaboral.getInstancia().setUsuarios(new UsuarioDAO().listarTodos());
             BolsaLaboral.getInstancia().setCentros(new CentroEmpleadorDAO().listarTodos());
             BolsaLaboral.getInstancia().setCandidatos(new CandidatoDAO().listarTodos());
+            cargarOfertasYVincularConCentros();
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             JOptionPane.showMessageDialog(this,
                     "No fue posible conectar con la base de datos:\n" + exception.getMessage(),
                     "Error de conexión", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void cargarOfertasYVincularConCentros() {
+        ArrayList<OfertaLaboral> ofertas = new OfertaLaboralDAO().listarTodos();
+        for (OfertaLaboral oferta : ofertas) {
+            int indiceCentro = BolsaLaboral.getInstancia()
+                    .buscarIndiceCentroByCodigo(oferta.getOfertador().getCodigo());
+            if (indiceCentro != -1) {
+                CentroEmpleador centroReal = BolsaLaboral.getInstancia().getCentros().get(indiceCentro);
+                oferta.setOfertador(centroReal);
+                centroReal.getOfertasLaborales().add(oferta);
+            }
+        }
+        BolsaLaboral.getInstancia().setOfertas(ofertas);
     }
 
     private JLabel fieldLabel(String text) {
