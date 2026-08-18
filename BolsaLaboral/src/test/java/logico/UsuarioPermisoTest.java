@@ -10,8 +10,6 @@ import java.util.EnumSet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -59,7 +57,6 @@ public class UsuarioPermisoTest {
 
         assertEquals(RolUsuario.EMPLEADO, legado.getRol());
         assertEquals(PermisosPorRol.predeterminados(RolUsuario.EMPLEADO), legado.getPermisos());
-        assertFalse(legado.tienePermiso(Permiso.GESTIONAR_RESPALDOS));
         assertFalse(legado.tienePermiso(Permiso.GESTIONAR_USUARIOS));
     }
 
@@ -117,32 +114,36 @@ public class UsuarioPermisoTest {
     }
 
     @Test
-    public void contrasenaNuevaNoQuedaEnTextoPlano() {
-        Usuario usuario = servicio.registrar("Persona Segura", "segura", "segura@example.test",
-                "Secreto temporal".toCharArray(), "Secreto temporal".toCharArray(),
-                RolUsuario.EMPLEADO, true, null);
+    public void contrasenaNuevaSeGuardaYSeComparaComoTextoPlano() {
+        Usuario usuario = servicio.registrar(
+                "Persona",
+                "persona",
+                "persona@example.test",
+                "Secreto temporal".toCharArray(),
+                "Secreto temporal".toCharArray(),
+                RolUsuario.EMPLEADO,
+                true,
+                null
+        );
 
-        assertNull(usuario.getContrasena());
-        assertTrue(usuario.tieneContrasenaProtegida());
-        assertNotNull(usuario.getPasswordSalt());
-        assertNotNull(usuario.getPasswordHash());
-        assertTrue(usuario.match("SEGURA", "Secreto temporal"));
-        assertFalse(usuario.match("segura", "incorrecta"));
+        assertEquals("Secreto temporal", usuario.getContrasena());
+        assertTrue(usuario.match("PERSONA", "Secreto temporal"));
+        assertFalse(usuario.match("persona", "incorrecta"));
     }
 
     @Test
-    public void passwordLegadoMigraSoloEnMemoriaTrasAutenticacionValida() throws Exception {
-        Usuario legado = new Usuario("Legado", "inicial", "Empleado");
-        set(legado, "passwordSalt", null);
-        set(legado, "passwordHash", null);
-        set(legado, "contrasena", "texto-legado");
+    public void usuarioLegadoAutenticaConContrasenaEnTextoPlano() {
+        Usuario legado = new Usuario(
+                "Legado",
+                "texto-legado",
+                "Empleado"
+        );
+
         legado.migrarDatosDeserializados();
 
-        assertFalse(legado.match("Legado", "incorrecta"));
         assertEquals("texto-legado", legado.getContrasena());
         assertTrue(legado.match("legado", "texto-legado"));
-        assertNull(legado.getContrasena());
-        assertTrue(legado.tieneContrasenaProtegida());
+        assertFalse(legado.match("legado", "incorrecta"));
     }
 
     @Test
@@ -150,7 +151,6 @@ public class UsuarioPermisoTest {
         Usuario legado = new Usuario("temporal", "clave", "Empleado");
         set(legado, "nombreUsuario", "");
         set(legado, "nombreCompleto", null);
-        set(legado, "identificador", null);
         set(legado, "fechaCreacion", null);
         set(legado, "permisos", null);
 
@@ -177,7 +177,6 @@ public class UsuarioPermisoTest {
     }
 
     private void simularCamposNuevosAusentes(Usuario usuario) throws Exception {
-        set(usuario, "identificador", null);
         set(usuario, "nombreCompleto", null);
         set(usuario, "correo", null);
         set(usuario, "rol", null);

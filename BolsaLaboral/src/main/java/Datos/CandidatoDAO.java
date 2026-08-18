@@ -156,6 +156,31 @@ public class CandidatoDAO {
     private static final String SELECT_ID_IDIOMA =
             "SELECT id_idioma FROM idiomas WHERE nombre = ?";
 
+    private static final String UPDATE_ESTADO =
+            "UPDATE candidatos SET estado = ? WHERE id_candidato = ?";
+
+    void actualizarEstado(
+            Connection con,
+            Candidato candidato,
+            String nuevoEstado) throws SQLException {
+
+        int idCandidato = extraerIdDelCodigo(candidato.getCodigo());
+
+        try (PreparedStatement ps = con.prepareStatement(UPDATE_ESTADO)) {
+            ps.setString(1, nuevoEstado);
+            ps.setInt(2, idCandidato);
+
+            int filasModificadas = ps.executeUpdate();
+
+            if (filasModificadas == 0) {
+                throw new SQLException(
+                        "No existe un candidato con id_candidato = "
+                                + idCandidato + "."
+                );
+            }
+        }
+    }
+
     public ArrayList<Candidato> listarTodos() {
         ArrayList<Candidato> resultado = new ArrayList<>();
 

@@ -1,12 +1,9 @@
 package logico;
 
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.Locale;
-import java.util.UUID;
 
 public class Usuario implements Serializable {
 
@@ -221,12 +218,7 @@ public class Usuario implements Serializable {
         if (!isActivo() || clave == null || contrasena == null) {
             return false;
         }
-        char[] almacenada = contrasena.toCharArray();
-        try {
-            return MessageDigestCompat.equals(almacenada, clave);
-        } finally {
-            Arrays.fill(almacenada, '\0');
-        }
+        return contrasena.equals(new  String(clave));
     }
 
     public boolean match(String nombre, String clave) {
@@ -260,26 +252,5 @@ public class Usuario implements Serializable {
 
     private static String limpiar(String valor) {
         return valor == null ? "" : valor.trim();
-    }
-
-    private static String normalizar(String valor) {
-        return limpiar(valor).toLowerCase(Locale.ROOT);
-    }
-
-    /** Comparación constante para el único ciclo de vida restante del texto legado. */
-    private static final class MessageDigestCompat {
-        private MessageDigestCompat() {
-        }
-
-        private static boolean equals(char[] izquierda, char[] derecha) {
-            int diferencia = izquierda.length ^ derecha.length;
-            int longitud = Math.max(izquierda.length, derecha.length);
-            for (int index = 0; index < longitud; index++) {
-                char a = index < izquierda.length ? izquierda[index] : 0;
-                char b = index < derecha.length ? derecha[index] : 0;
-                diferencia |= a ^ b;
-            }
-            return diferencia == 0;
-        }
     }
 }

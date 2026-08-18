@@ -32,6 +32,12 @@ public class SolicitudDAO {
     private static final String UPDATE_ESTADO =
             "UPDATE solicitudes SET estado = ?, fechaDecision = ? WHERE id_solicitud = ?";
 
+    private static final String RECHAZAR_OTRAS_ENVIADAS =
+            "UPDATE solicitudes SET estado = ?, fechaDecision = ? " +
+                    "WHERE id_candidato = ? " +
+                    "AND id_solicitud <> ? " +
+                    "AND estado = ?";
+
     public ArrayList<Solicitud> listarTodos(ArrayList<Candidato> candidatosDisponibles,
                                             ArrayList<OfertaLaboral> ofertasDisponibles) {
 
@@ -123,27 +129,84 @@ public class SolicitudDAO {
         }
     }
 
-    public void actualizarEstado(Solicitud solicitud, LocalDate fechaDecision) {
+    void actualizarEstado(
+            Connection con,
+            Solicitud solicitud,
+            String nuevoEstado,
+            LocalDate fechaDecision) throws SQLException {
+
         int idSolicitud = extraerIdDelCodigo(solicitud.getCodigo());
 
-        try (Connection con = Conexion.obtenerConexion();
-             PreparedStatement ps = con.prepareStatement(UPDATE_ESTADO)) {
+        try (PreparedStatement ps = con.prepareStatement(UPDATE_ESTADO)) {
+            ps.setString(1, nuevoEstado);
 
-            ps.setString(1, solicitud.getEstado());
             if (fechaDecision == null) {
                 ps.setNull(2, java.sql.Types.DATE);
             } else {
                 ps.setDate(2, Date.valueOf(fechaDecision));
             }
+
             ps.setInt(3, idSolicitud);
 
             int filasModificadas = ps.executeUpdate();
+
             if (filasModificadas == 0) {
-                throw new SQLException("No existe una solicitud con id_solicitud = " + idSolicitud + ".");
+                throw new SQLException(
+                        "No existe una solicitud con id_solicitud = "
+                                + idSolicitud + "."
+                );
+            }
+        }
+    }
+
+    void rechazarOtrasSolicitudesEnviadas(
+            Connection con,
+            Candidato candidato,
+            Solicitud solicitudAprobada,
+            LocalDate fechaDecision) throws SQLException {
+
+        int idCandidato = extraerId(
+                candidato.getCodigo(),
+                PREFIJO_CODIGO_CANDIDATO,
+                "El candidato no tiene código.",
+                "Código de candidato inválido: "
+        );
+
+        int idSolicitudAprobada =
+                extraerIdDelCodigo(solicitudAprobada.getCodigo());
+
+        try (PreparedStatement ps =
+                     con.prepareStatement(RECHAZAR_OTRAS_ENVIADAS)) {
+
+            ps.setString(1, Solicitud.ESTADO_RECHAZADA);
+
+            if (fechaDecision == null) {
+                ps.setNull(2, java.sql.Types.DATE);
+            } else {
+                ps.setDate(2, Date.valueOf(fechaDecision));
             }
 
+            ps.setInt(3, idCandidato);
+            ps.setInt(4, idSolicitudAprobada);
+            ps.setString(5, Solicitud.ESTADO_ENVIADA);
+
+            ps.executeUpdate();
+        }
+    }
+
+    public void actualizarEstado(Solicitud solicitud, LocalDate fechaDecision) {
+        try (Connection con = Conexion.obtenerConexion()) {
+            actualizarEstado(
+                    con,
+                    solicitud,
+                    solicitud.getEstado(),
+                    fechaDecision
+            );
         } catch (SQLException e) {
-            throw new RuntimeException("Error actualizando el estado de la solicitud", e);
+            throw new RuntimeException(
+                    "Error actualizando el estado de la solicitud",
+                    e
+            );
         }
     }
 

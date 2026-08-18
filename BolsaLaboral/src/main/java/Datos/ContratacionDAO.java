@@ -2,6 +2,7 @@ package Datos;
 
 import logico.Solicitud;
 import logico.VacanteCompletada;
+import logico.Candidato;
 
 import java.sql.Connection;
 import java.sql.Date;
@@ -72,28 +73,143 @@ public class ContratacionDAO {
         return resultado;
     }
 
-    public void agregar(VacanteCompletada vacante) {
-        int idSolicitud = extraerId(vacante.getSolicitudAceptada().getCodigo(),
-                PREFIJO_CODIGO_SOLICITUD, "La solicitud de la contratación no tiene código.",
-                "Código de solicitud inválido: ");
+    private int insertar(
+            Connection con,
+            VacanteCompletada vacante) throws SQLException {
 
-        try (Connection con = Conexion.obtenerConexion();
-             PreparedStatement ps = con.prepareStatement(INSERT, Statement.RETURN_GENERATED_KEYS)) {
+        int idSolicitud = extraerId(
+                vacante.getSolicitudAceptada().getCodigo(),
+                PREFIJO_CODIGO_SOLICITUD,
+                "La solicitud de la contratación no tiene código.",
+                "Código de solicitud inválido: "
+        );
 
-            ps.setDate(1, Date.valueOf(vacante.getFechaContratacion()));
+        try (PreparedStatement ps = con.prepareStatement(
+                INSERT,
+                Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setDate(
+                    1,
+                    Date.valueOf(vacante.getFechaContratacion())
+            );
             ps.setInt(2, idSolicitud);
+
             ps.executeUpdate();
 
             try (ResultSet claves = ps.getGeneratedKeys()) {
                 if (!claves.next()) {
-                    throw new SQLException("No se obtuvo el id generado para la contratación.");
+                    throw new SQLException(
+                            "No se obtuvo el id generado para la contratación."
+                    );
                 }
-                vacante.setCodigo(PREFIJO_CODIGO + claves.getInt(1));
+
+                return claves.getInt(1);
+            }
+        }
+    }
+
+    public void agregar(VacanteCompletada vacante) {
+        try (Connection con = Conexion.obtenerConexion()) {
+            int idGenerado = insertar(con, vacante);
+            vacante.setCodigo(PREFIJO_CODIGO + idGenerado);
+
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Error agregando la contratación a la base de datos",
+                    e
+            );
+        }
+    }
+
+    public void contratarAtomico(
+            Solicitud solicitud,
+            VacanteCompletada vacante) {
+
+        if (solicitud == null) {
+            throw new IllegalArgumentException(
+                    "La solicitud es obligatoria."
+            );
+        }
+
+        Candidato candidato = solicitud.getSolicitante();
+
+        if (candidato == null) {
+            throw new IllegalArgumentException(
+                    "La solicitud no tiene candidato."
+            );
+        }
+
+        if (vacante == null) {
+            throw new IllegalArgumentException(
+                    "La contratación es obligatoria."
+            );
+        }
+
+        if (vacante.getFechaContratacion() == null) {
+            throw new IllegalArgumentException(
+                    "La fecha de contratación es obligatoria."
+            );
+        }
+
+        LocalDate fechaDecision = vacante.getFechaContratacion();
+
+        try (Connection con = Conexion.obtenerConexion()) {
+            con.setAutoCommit(false);
+
+            try {
+                SolicitudDAO solicitudDAO = new SolicitudDAO();
+                CandidatoDAO candidatoDAO = new CandidatoDAO();
+
+                solicitudDAO.actualizarEstado(
+                        con,
+                        solicitud,
+                        Solicitud.ESTADO_APROBADA,
+                        fechaDecision
+                );
+
+                solicitudDAO.rechazarOtrasSolicitudesEnviadas(
+                        con,
+                        candidato,
+                        solicitud,
+                        fechaDecision
+                );
+
+                int idContratacion = insertar(con, vacante);
+
+                candidatoDAO.actualizarEstado(
+                        con,
+                        candidato,
+                        Candidato.ESTADO_EMPLEADO
+                );
+
+                con.commit();
+
+                /*
+                 * El objeto se modifica solamente después de que
+                 * SQL Server confirmó toda la transacción.
+                 */
+                vacante.setCodigo(
+                        PREFIJO_CODIGO + idContratacion
+                );
+
+            } catch (SQLException | RuntimeException e) {
+                try {
+                    con.rollback();
+                } catch (SQLException rollbackException) {
+                    e.addSuppressed(rollbackException);
+                }
+
+                throw e;
             }
 
         } catch (SQLException e) {
-            throw new RuntimeException("Error agregando la contratación a la base de datos", e);
+            throw new RuntimeException(
+                    "Error registrando la contratación completa",
+                    e
+            );
         }
+
+
     }
 
     private int extraerId(String codigo, String prefijo, String mensajeVacio, String mensajeInvalido) {

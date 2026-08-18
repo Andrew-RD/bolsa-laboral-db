@@ -778,27 +778,57 @@ public class BolsaLaboral implements Serializable{
 	}
 
 	public boolean contratarCandidato(Solicitud solicitud) {
-		AutorizacionService.exigirPermiso(usuarioActual, Permiso.PROCESAR_SOLICITUDES);
+		AutorizacionService.exigirPermiso(
+				usuarioActual,
+				Permiso.PROCESAR_SOLICITUDES
+		);
+
 		if (!puedeContratarCandidato(solicitud)) {
 			return false;
 		}
 
 		OfertaLaboral oferta = solicitud.getOfertaSolicitada();
 		Candidato candidato = solicitud.getSolicitante();
+		LocalDate fechaContratacion = LocalDate.now();
+
+		VacanteCompletada vacante = new VacanteCompletada(
+				null,
+				solicitud,
+				oferta,
+				fechaContratacion
+		);
+
+		/*
+		 * Primero se guarda todo en SQL. Si algo falla, se ejecuta
+		 * rollback y ningún objeto en memoria ha sido modificado.
+		 */
+		new ContratacionDAO().contratarAtomico(
+				solicitud,
+				vacante
+		);
+
+		/*
+		 * SQL ya hizo commit. Ahora se sincroniza la memoria.
+		 */
 		solicitud.setEstado(Solicitud.ESTADO_APROBADA);
-		new SolicitudDAO().actualizarEstado(solicitud, LocalDate.now());
-		if (candidato.getMisSolicitudes() == null || !candidato.getMisSolicitudes().contains(solicitud)) {
+
+		if (candidato.getMisSolicitudes() == null
+				|| !candidato.getMisSolicitudes().contains(solicitud)) {
 			candidato.addSolicitud(solicitud);
 		}
+
 		candidato.cambiarEstadoSolicitudesAEmpleado();
 
-		VacanteCompletada vacante = new VacanteCompletada(null, solicitud, oferta, LocalDate.now());
-		new ContratacionDAO().agregar(vacante);
 		if (vacantes == null) {
 			vacantes = new ArrayList<VacanteCompletada>();
 		}
+
 		vacantes.add(vacante);
-		oferta.sincronizarVacantesOcupadas(contarVacantesOcupadas(oferta));
+
+		oferta.sincronizarVacantesOcupadas(
+				contarVacantesOcupadas(oferta)
+		);
+
 		return true;
 	}
 
