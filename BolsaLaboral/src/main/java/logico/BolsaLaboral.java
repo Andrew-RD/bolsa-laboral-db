@@ -429,11 +429,22 @@ public class BolsaLaboral implements Serializable{
 		return encontrado;
 	}
 
+	private boolean puedeCrearSolicitud(Candidato candidato) {
+		if (candidato == null) {
+			return false;
+		}
+
+		String estado = candidato.getEstado();
+
+		return Candidato.ESTADO_DESEMPLEADO.equals(estado)
+				|| Candidato.ESTADO_EN_ESPERA.equals(estado);
+	}
+
 	public ArrayList<ResultadoMatcheo> obtenerCandidatosOrdenadosParaOferta(OfertaLaboral oferta) {
 		ArrayList<ResultadoMatcheo> ordenados = new ArrayList<ResultadoMatcheo>();
 		for (Candidato candidato : candidatos) {
-			if (candidato != null
-					&& Candidato.ESTADO_DESEMPLEADO.equals(candidato.getEstado())) {
+			if (puedeCrearSolicitud(candidato)
+					&& !existeSolicitud(candidato, oferta)) {
 				int puntaje = calcularPuntaje(candidato, oferta);
 				if (puntaje >= oferta.getPorcentajeMinimo()) {
 					String condicion = obtenerCondicion(
@@ -955,9 +966,10 @@ public class BolsaLaboral implements Serializable{
 		}
 		Candidato candidato = resultado.getSolicitante();
 		if (!candidatos.contains(candidato)
-				|| !Candidato.ESTADO_DESEMPLEADO.equals(candidato.getEstado())) {
+				|| !puedeCrearSolicitud(candidato)) {
 			return DecisionProcesamiento.rechazar(
-					"El candidato ya no está elegible para una nueva solicitud.");
+					"El candidato ya no está elegible para una nueva solicitud."
+			);
 		}
 		if (resultado.getPorcentaje() < resultado.getOferta().getPorcentajeMinimo()) {
 			return DecisionProcesamiento.rechazar(

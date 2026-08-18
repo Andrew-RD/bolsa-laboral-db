@@ -108,49 +108,13 @@ public class ContratacionDAO {
         }
     }
 
-    public void agregar(VacanteCompletada vacante) {
-        try (Connection con = Conexion.obtenerConexion()) {
-            int idGenerado = insertar(con, vacante);
-            vacante.setCodigo(PREFIJO_CODIGO + idGenerado);
-
-        } catch (SQLException e) {
-            throw new RuntimeException(
-                    "Error agregando la contratación a la base de datos",
-                    e
-            );
-        }
-    }
-
     public void contratarAtomico(
             Solicitud solicitud,
             VacanteCompletada vacante) {
 
-        if (solicitud == null) {
-            throw new IllegalArgumentException(
-                    "La solicitud es obligatoria."
-            );
-        }
+        validarContratacion(solicitud, vacante);
 
         Candidato candidato = solicitud.getSolicitante();
-
-        if (candidato == null) {
-            throw new IllegalArgumentException(
-                    "La solicitud no tiene candidato."
-            );
-        }
-
-        if (vacante == null) {
-            throw new IllegalArgumentException(
-                    "La contratación es obligatoria."
-            );
-        }
-
-        if (vacante.getFechaContratacion() == null) {
-            throw new IllegalArgumentException(
-                    "La fecha de contratación es obligatoria."
-            );
-        }
-
         LocalDate fechaDecision = vacante.getFechaContratacion();
 
         try (Connection con = Conexion.obtenerConexion()) {
@@ -184,10 +148,6 @@ public class ContratacionDAO {
 
                 con.commit();
 
-                /*
-                 * El objeto se modifica solamente después de que
-                 * SQL Server confirmó toda la transacción.
-                 */
                 vacante.setCodigo(
                         PREFIJO_CODIGO + idContratacion
                 );
@@ -208,8 +168,6 @@ public class ContratacionDAO {
                     e
             );
         }
-
-
     }
 
     private int extraerId(String codigo, String prefijo, String mensajeVacio, String mensajeInvalido) {
@@ -226,6 +184,78 @@ public class ContratacionDAO {
             return Integer.parseInt(valorNumerico);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(mensajeInvalido + codigo, e);
+        }
+    }
+
+    private void validarContratacion(
+            Solicitud solicitud,
+            VacanteCompletada vacante) {
+
+        if (solicitud == null) {
+            throw new IllegalArgumentException(
+                    "La solicitud es obligatoria."
+            );
+        }
+
+        if (vacante == null) {
+            throw new IllegalArgumentException(
+                    "La contratación es obligatoria."
+            );
+        }
+
+        if (solicitud.getSolicitante() == null) {
+            throw new IllegalArgumentException(
+                    "La solicitud no tiene candidato."
+            );
+        }
+
+        if (solicitud.getOfertaSolicitada() == null) {
+            throw new IllegalArgumentException(
+                    "La solicitud no tiene oferta laboral."
+            );
+        }
+
+        if (vacante.getSolicitudAceptada() == null) {
+            throw new IllegalArgumentException(
+                    "La contratación no tiene solicitud aceptada."
+            );
+        }
+
+        if (vacante.getOfertaOcupada() == null) {
+            throw new IllegalArgumentException(
+                    "La contratación no tiene oferta laboral."
+            );
+        }
+
+        if (vacante.getFechaContratacion() == null) {
+            throw new IllegalArgumentException(
+                    "La fecha de contratación es obligatoria."
+            );
+        }
+
+        String codigoSolicitud = solicitud.getCodigo();
+        String codigoSolicitudVacante =
+                vacante.getSolicitudAceptada().getCodigo();
+
+        if (codigoSolicitud == null
+                || !codigoSolicitud.equals(codigoSolicitudVacante)) {
+            throw new IllegalArgumentException(
+                    "La solicitud aprobada no coincide con la solicitud "
+                            + "de la contratación."
+            );
+        }
+
+        String codigoOferta =
+                solicitud.getOfertaSolicitada().getCodigo();
+        String codigoOfertaVacante =
+                vacante.getOfertaOcupada().getCodigo();
+
+        if (codigoOferta == null
+                || !codigoOferta.equals(codigoOfertaVacante)) {
+            throw new IllegalArgumentException(
+                    "La oferta de la solicitud no coincide con la oferta "
+                            + "de la contratación."
+            );
         }
     }
 }
