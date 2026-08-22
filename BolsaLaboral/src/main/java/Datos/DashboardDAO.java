@@ -33,10 +33,20 @@ public class DashboardDAO {
                     "WHERE estado = ? " +
                     "GROUP BY id_municipio" +
                     "), " +
+                    "ocupadas_por_oferta AS ( " +
+                    "SELECT s.id_oferta, COUNT(c.id_contratacion) AS ocupadas " +
+                    "FROM solicitudes s " +
+                    "JOIN Contrataciones c ON c.id_solicitud = s.id_solicitud " +
+                    "GROUP BY s.id_oferta" +
+                    "), " +
                     "vacantes_por_municipio AS ( " +
-                    "SELECT ce.id_municipio, SUM(o.vacantesTotales) AS vacantes_disponibles " +
+                    "SELECT ce.id_municipio, " +
+                    "SUM(CASE WHEN o.vacantesTotales - COALESCE(oo.ocupadas, 0) > 0 " +
+                    "THEN o.vacantesTotales - COALESCE(oo.ocupadas, 0) ELSE 0 END) " +
+                    "AS vacantes_disponibles " +
                     "FROM centrosEmpleadores ce " +
                     "JOIN ofertas o ON o.id_centroEmpleador = ce.id_centroEmpleador " +
+                    "LEFT JOIN ocupadas_por_oferta oo ON oo.id_oferta = o.id_oferta " +
                     "WHERE o.estado = ? " +
                     "GROUP BY ce.id_municipio" +
                     ") " +
