@@ -94,7 +94,10 @@ public class ContratacionDAO {
             );
             ps.setInt(2, idSolicitud);
 
-            ps.executeUpdate();
+            int filasInsertadas = ps.executeUpdate();
+            if (filasInsertadas != 1) {
+                throw new SQLException("No se insertó exactamente una contratación.");
+            }
 
             try (ResultSet claves = ps.getGeneratedKeys()) {
                 if (!claves.next()) {
@@ -116,6 +119,8 @@ public class ContratacionDAO {
 
         Candidato candidato = solicitud.getSolicitante();
         LocalDate fechaDecision = vacante.getFechaContratacion();
+        int idContratacionGenerada = 0;
+        boolean transaccionConfirmada = false;
 
         try (Connection con = Conexion.obtenerConexion()) {
             con.setAutoCommit(false);
@@ -123,11 +128,26 @@ public class ContratacionDAO {
             try {
                 SolicitudDAO solicitudDAO = new SolicitudDAO();
                 CandidatoDAO candidatoDAO = new CandidatoDAO();
+                OfertaLaboralDAO ofertaLaboralDAO = new OfertaLaboralDAO();
 
-                solicitudDAO.actualizarEstado(
+                String estadoPersistidoCandidato = candidatoDAO.bloquearParaProcesamiento(
+                        con,
+                        candidato
+                );
+                if (Candidato.ESTADO_EMPLEADO.equals(estadoPersistidoCandidato)) {
+                    throw new SQLException(
+                            "El candidato ya figura como empleado y no puede ser contratado nuevamente."
+                    );
+                }
+
+                ofertaLaboralDAO.bloquearYValidarCapacidad(
+                        con,
+                        solicitud.getOfertaSolicitada()
+                );
+
+                solicitudDAO.aprobarEnviada(
                         con,
                         solicitud,
-                        Solicitud.ESTADO_APROBADA,
                         fechaDecision
                 );
 
@@ -138,7 +158,7 @@ public class ContratacionDAO {
                         fechaDecision
                 );
 
-                int idContratacion = insertar(con, vacante);
+                idContratacionGenerada = insertar(con, vacante);
 
                 candidatoDAO.actualizarEstado(
                         con,
@@ -146,11 +166,13 @@ public class ContratacionDAO {
                         Candidato.ESTADO_EMPLEADO
                 );
 
-                con.commit();
-
-                vacante.setCodigo(
-                        PREFIJO_CODIGO + idContratacion
+                ofertaLaboralDAO.actualizarEstadoTrasContratacion(
+                        con,
+                        solicitud.getOfertaSolicitada()
                 );
+
+                con.commit();
+                transaccionConfirmada = true;
 
             } catch (SQLException | RuntimeException e) {
                 try {
@@ -163,11 +185,15 @@ public class ContratacionDAO {
             }
 
         } catch (SQLException e) {
-            throw new RuntimeException(
-                    "Error registrando la contratación completa",
-                    e
-            );
+            if (!transaccionConfirmada) {
+                throw new RuntimeException(
+                        "Error registrando la contratación completa",
+                        e
+                );
+            }
         }
+
+        vacante.setCodigo(PREFIJO_CODIGO + idContratacionGenerada);
     }
 
     private int extraerId(String codigo, String prefijo, String mensajeVacio, String mensajeInvalido) {

@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 
 public class OfertaLaboralDAO {
 
@@ -98,6 +99,27 @@ public class OfertaLaboralDAO {
 
     private static final String DELETE_OFERTA =
             "DELETE FROM ofertas WHERE id_oferta = ?";
+
+    private static final String SELECT_RESUMEN_VACANTES =
+            "SELECT o.vacantesTotales, COUNT(c.id_contratacion) AS ocupadas " +
+                    "FROM ofertas o " +
+                    "LEFT JOIN solicitudes s ON s.id_oferta = o.id_oferta " +
+                    "LEFT JOIN Contrataciones c ON c.id_solicitud = s.id_solicitud " +
+                    "WHERE o.id_oferta = ? " +
+                    "GROUP BY o.vacantesTotales";
+
+    private static final String SELECT_OFERTA_BLOQUEADA =
+            "SELECT vacantesTotales FROM ofertas WITH (UPDLOCK, HOLDLOCK) " +
+                    "WHERE id_oferta = ?";
+
+    private static final String COUNT_CONTRATACIONES_OFERTA =
+            "SELECT COUNT(c.id_contratacion) " +
+                    "FROM Contrataciones c " +
+                    "JOIN solicitudes s ON s.id_solicitud = c.id_solicitud " +
+                    "WHERE s.id_oferta = ?";
+
+    private static final String UPDATE_ESTADO =
+            "UPDATE ofertas SET estado = ? WHERE id_oferta = ?";
 
     public ArrayList<OfertaLaboral> listarTodos() {
         ArrayList<OfertaLaboral> resultado = new ArrayList<>();
@@ -248,6 +270,75 @@ public class OfertaLaboralDAO {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Error eliminando la oferta laboral", e);
+        }
+    }
+
+    void actualizarEstadoTrasContratacion(
+            Connection con,
+            OfertaLaboral oferta) throws SQLException {
+
+        int idOferta = extraerIdDelCodigo(oferta.getCodigo());
+        int vacantesTotales;
+        int ocupadas;
+
+        try (PreparedStatement ps = con.prepareStatement(SELECT_RESUMEN_VACANTES)) {
+            ps.setInt(1, idOferta);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException("No existe una oferta con id_oferta = " + idOferta + ".");
+                }
+                vacantesTotales = rs.getInt("vacantesTotales");
+                ocupadas = rs.getInt("ocupadas");
+            }
+        }
+
+        String nuevoEstado = ocupadas >= vacantesTotales
+                ? OfertaLaboral.ESTADO_COMPLETADA
+                : OfertaLaboral.ESTADO_ACTIVA;
+
+        try (PreparedStatement ps = con.prepareStatement(UPDATE_ESTADO)) {
+            ps.setString(1, nuevoEstado);
+            ps.setInt(2, idOferta);
+            int filasModificadas = ps.executeUpdate();
+            if (filasModificadas != 1) {
+                throw new SQLException("No se actualizó exactamente una oferta con id_oferta = "
+                        + idOferta + ".");
+            }
+        }
+    }
+
+    void bloquearYValidarCapacidad(
+            Connection con,
+            OfertaLaboral oferta) throws SQLException {
+
+        int idOferta = extraerIdDelCodigo(oferta.getCodigo());
+        int vacantesTotales;
+
+        try (PreparedStatement ps = con.prepareStatement(SELECT_OFERTA_BLOQUEADA)) {
+            ps.setInt(1, idOferta);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException("No existe una oferta con id_oferta = " + idOferta + ".");
+                }
+                vacantesTotales = rs.getInt("vacantesTotales");
+            }
+        }
+
+        int contratacionesPersistidas;
+        try (PreparedStatement ps = con.prepareStatement(COUNT_CONTRATACIONES_OFERTA)) {
+            ps.setInt(1, idOferta);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException("No se pudo contar las contrataciones de la oferta.");
+                }
+                contratacionesPersistidas = rs.getInt(1);
+            }
+        }
+
+        if (contratacionesPersistidas >= vacantesTotales) {
+            throw new SQLException(
+                    "La oferta ya no tiene vacantes disponibles para contratar."
+            );
         }
     }
 
@@ -486,6 +577,10 @@ public class OfertaLaboralDAO {
                 rs.getBoolean("obligatorioMayorDeEdad"),
                 rs.getBoolean("obligatorioLicencia"),
                 rs.getString("nivelAcademico"),
+                mapearTipoCandidato(
+                        rs.getString("tipoCandidatoRequerido"),
+                        rs.getString("nivelAcademico")
+                ),
                 requisitos,
                 idiomas,
                 rs.getInt("porcentajeMinimo")
@@ -494,6 +589,25 @@ public class OfertaLaboralDAO {
         oferta.sincronizarVacantesOcupadas(ocupadas);
 
         return oferta;
+    }
+
+    private TipoCandidato mapearTipoCandidato(String valor, String nivelAcademico) throws SQLException {
+        if (valor != null && !valor.trim().isEmpty()) {
+            try {
+                return TipoCandidato.valueOf(valor.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                TipoCandidato legado = TipoCandidato.desdeTextoLegado(valor);
+                if (legado != null) {
+                    return legado;
+                }
+            }
+        }
+
+        TipoCandidato inferido = TipoCandidato.desdeTextoLegado(nivelAcademico);
+        if (inferido != null) {
+            return inferido;
+        }
+        throw new SQLException("La oferta no tiene un tipo de candidato requerido reconocido.");
     }
 
     private String crearCodigo(int idOferta) {

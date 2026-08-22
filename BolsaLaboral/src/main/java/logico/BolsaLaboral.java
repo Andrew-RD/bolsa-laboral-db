@@ -293,8 +293,7 @@ public class BolsaLaboral implements Serializable{
 		}
 		String limpio = estado.trim();
 		String canonico = null;
-		if ("Aprovada".equalsIgnoreCase(limpio)
-				|| Solicitud.ESTADO_APROBADA.equalsIgnoreCase(limpio)) {
+		if (Solicitud.esEstadoAprobada(limpio)) {
 			canonico = Solicitud.ESTADO_APROBADA;
 		} else if (Solicitud.ESTADO_ENVIADA.equalsIgnoreCase(limpio)) {
 			canonico = Solicitud.ESTADO_ENVIADA;
@@ -755,10 +754,10 @@ public class BolsaLaboral implements Serializable{
 		if (!verificarSolicitud(sol)) {
 			return false;
 		}
-		new SolicitudDAO().agregar(sol);
+		new SolicitudDAO().vincularAtomico(sol);
 		solicitudes.add(sol);
 		resMatchSelec.getSolicitante().addSolicitud(sol);
-		resMatchSelec.getSolicitante().actualizarEstadoLaboral();
+		resMatchSelec.getSolicitante().setEstado(Candidato.ESTADO_EN_ESPERA);
 		return true;
 	}
 
@@ -822,13 +821,14 @@ public class BolsaLaboral implements Serializable{
 		 * SQL ya hizo commit. Ahora se sincroniza la memoria.
 		 */
 		solicitud.setEstado(Solicitud.ESTADO_APROBADA);
+		solicitud.setFechaDecision(fechaContratacion);
 
 		if (candidato.getMisSolicitudes() == null
 				|| !candidato.getMisSolicitudes().contains(solicitud)) {
 			candidato.addSolicitud(solicitud);
 		}
 
-		candidato.cambiarEstadoSolicitudesAEmpleado();
+		candidato.cambiarEstadoSolicitudesAEmpleado(fechaContratacion);
 
 		if (vacantes == null) {
 			vacantes = new ArrayList<VacanteCompletada>();
@@ -848,15 +848,19 @@ public class BolsaLaboral implements Serializable{
 		if (!esProcesable(solicitud)) {
 			return;
 		}
-		solicitud.setEstado(Solicitud.ESTADO_RECHAZADA);
-		new SolicitudDAO().actualizarEstado(solicitud, LocalDate.now());
 		Candidato candidato = solicitud.getSolicitante();
-		if (candidato != null) {
-			if (candidato.getMisSolicitudes() == null || !candidato.getMisSolicitudes().contains(solicitud)) {
-				candidato.addSolicitud(solicitud);
-			}
-			candidato.cambiarEstadoSolicitudesADesempleado();
+		LocalDate fechaDecision = LocalDate.now();
+		String estadoCandidato = new SolicitudDAO().rechazarAtomico(
+				solicitud,
+				fechaDecision
+		);
+
+		solicitud.setEstado(Solicitud.ESTADO_RECHAZADA);
+		solicitud.setFechaDecision(fechaDecision);
+		if (candidato.getMisSolicitudes() == null || !candidato.getMisSolicitudes().contains(solicitud)) {
+			candidato.addSolicitud(solicitud);
 		}
+		candidato.setEstado(estadoCandidato);
 	}
 
 	public Solicitud buscarSolicitudByCodigo(String codigo) {

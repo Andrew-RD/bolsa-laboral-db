@@ -28,6 +28,7 @@ public class CandidatoDAO {
                     "c.licenciaConducir, c.disposicionMudarse, c.estado, " +
                     "al.nombre AS areaLaboral, " +
                     "p.nombre AS provincia, m.nombre AS municipio, " +
+                    "u.id_universidad AS universidadId, " +
                     "uni.nombre AS universidad, " +
                     "car.nombre AS carrera, " +
                     "u.nivelAcademico, u.situacionAcademica, " +
@@ -153,11 +154,39 @@ public class CandidatoDAO {
     private static final String SELECT_ID_UNIVERSIDAD =
             "SELECT id_universidad FROM universidades WHERE nombre = ?";
 
+    private static final String SELECT_ID_UNIVERSIDAD_POR_ID =
+            "SELECT id_universidad FROM universidades WHERE id_universidad = ?";
+
     private static final String SELECT_ID_IDIOMA =
             "SELECT id_idioma FROM idiomas WHERE nombre = ?";
 
     private static final String UPDATE_ESTADO =
             "UPDATE candidatos SET estado = ? WHERE id_candidato = ?";
+
+    private static final String UPDATE_ESTADO_PARA_VINCULACION =
+            "UPDATE candidatos SET estado = ? WHERE id_candidato = ? AND estado IN (?, ?)";
+
+    private static final String BLOQUEAR_CANDIDATO =
+            "SELECT estado FROM candidatos WITH (UPDLOCK, HOLDLOCK) WHERE id_candidato = ?";
+
+    String bloquearParaProcesamiento(
+            Connection con,
+            Candidato candidato) throws SQLException {
+
+        int idCandidato = extraerIdDelCodigo(candidato.getCodigo());
+
+        try (PreparedStatement ps = con.prepareStatement(BLOQUEAR_CANDIDATO)) {
+            ps.setInt(1, idCandidato);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException(
+                            "No existe un candidato con id_candidato = " + idCandidato + "."
+                    );
+                }
+                return rs.getString("estado");
+            }
+        }
+    }
 
     void actualizarEstado(
             Connection con,
@@ -176,6 +205,27 @@ public class CandidatoDAO {
                 throw new SQLException(
                         "No existe un candidato con id_candidato = "
                                 + idCandidato + "."
+                );
+            }
+        }
+    }
+
+    void actualizarEstadoParaVinculacion(
+            Connection con,
+            Candidato candidato) throws SQLException {
+
+        int idCandidato = extraerIdDelCodigo(candidato.getCodigo());
+
+        try (PreparedStatement ps = con.prepareStatement(UPDATE_ESTADO_PARA_VINCULACION)) {
+            ps.setString(1, Candidato.ESTADO_EN_ESPERA);
+            ps.setInt(2, idCandidato);
+            ps.setString(3, Candidato.ESTADO_DESEMPLEADO);
+            ps.setString(4, Candidato.ESTADO_EN_ESPERA);
+
+            int filasModificadas = ps.executeUpdate();
+            if (filasModificadas != 1) {
+                throw new SQLException(
+                        "El candidato no existe o ya no puede crear solicitudes."
                 );
             }
         }
@@ -422,7 +472,7 @@ public class CandidatoDAO {
     private void insertarSubtipo(Connection con, Candidato candidato, int idCandidato) throws SQLException {
         if (candidato instanceof Universitario) {
             Universitario universitario = (Universitario) candidato;
-            int idUniversidad = buscarIdUniversidad(con, universitario.getUniversidad());
+            int idUniversidad = resolverIdUniversidad(con, universitario);
             int idCarrera = buscarIdRequerimiento(con, "carreras", universitario.getCarrera());
 
             try (PreparedStatement ps = con.prepareStatement(INSERT_UNIVERSITARIO)) {
@@ -460,7 +510,7 @@ public class CandidatoDAO {
     private void actualizarSubtipo(Connection con, Candidato candidato, int idCandidato) throws SQLException {
         if (candidato instanceof Universitario) {
             Universitario universitario = (Universitario) candidato;
-            int idUniversidad = buscarIdUniversidad(con, universitario.getUniversidad());
+            int idUniversidad = resolverIdUniversidad(con, universitario);
             int idCarrera = buscarIdRequerimiento(con, "carreras", universitario.getCarrera());
 
             try (PreparedStatement ps = con.prepareStatement(UPDATE_UNIVERSITARIO)) {
@@ -646,7 +696,26 @@ public class CandidatoDAO {
         throw new SQLException("No existe la universidad '" + nombre + "'.");
     }
 
+    private int resolverIdUniversidad(Connection con, Universitario universitario) throws SQLException {
+        Integer universidadId = universitario.getUniversidadId();
+        if (universidadId == null) {
+            return buscarIdUniversidad(con, universitario.getUniversidad());
+        }
+
+        try (PreparedStatement ps = con.prepareStatement(SELECT_ID_UNIVERSIDAD_POR_ID)) {
+            ps.setInt(1, universidadId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("id_universidad");
+                }
+            }
+        }
+        throw new SQLException("No existe una universidad con id_universidad = "
+                + universidadId + ".");
+    }
+
     private int buscarIdRequerimiento(Connection con, String tablaSubtipo, String nombre) throws SQLException {
+        validarTablaRequerimiento(tablaSubtipo);
         String sql = "SELECT r.id_requerimiento FROM requerimientos r "
                 + "JOIN " + tablaSubtipo + " s ON s.id_requerimiento = r.id_requerimiento "
                 + "WHERE r.nombre = ?";
@@ -661,6 +730,16 @@ public class CandidatoDAO {
             }
         }
         throw new SQLException("No existe '" + nombre + "' en " + tablaSubtipo + ".");
+    }
+
+    private void validarTablaRequerimiento(String tablaSubtipo) {
+        if (!"carreras".equals(tablaSubtipo)
+                && !"areasTecnicas".equals(tablaSubtipo)
+                && !"habilidades".equals(tablaSubtipo)) {
+            throw new IllegalArgumentException(
+                    "Tabla de requerimientos no permitida: " + tablaSubtipo
+            );
+        }
     }
 
     private int buscarIdIdioma(Connection con, String nombre) throws SQLException {
@@ -720,10 +799,14 @@ public class CandidatoDAO {
             String nivelAcademico = rs.getString("nivelAcademico");
             SituacionAcademica situacionAcademica = mapearSituacionAcademica(rs.getString("situacionAcademica"));
 
-            return new Universitario(codigo, identificacion, nombres, apellidos, fechaNacimiento, genero,
+            Universitario universitario = new Universitario(codigo, identificacion, nombres, apellidos,
+                    fechaNacimiento, genero,
                     provincia, municipio, telefono, correo, jornada, modalidad, areaDeInteres,
                     aspiracionSalarial, licenciaConducir, disposicionMudarse, idiomas,
                     universidad, carrera, nivelAcademico, situacionAcademica, estado);
+            int universidadId = rs.getInt("universidadId");
+            universitario.setUniversidadId(rs.wasNull() ? null : universidadId);
+            return universitario;
 
         } else if ("TECNICO".equals(tipoCandidato)) {
             String areaTecnica = rs.getString("areaTecnica");

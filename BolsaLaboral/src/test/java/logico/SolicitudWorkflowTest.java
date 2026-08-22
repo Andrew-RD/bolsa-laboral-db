@@ -72,6 +72,7 @@ public class SolicitudWorkflowTest {
         bolsa.rechazarCandidato(seleccionada);
 
         assertEquals("Rechazada", seleccionada.getEstado());
+        assertEquals(LocalDate.now(), seleccionada.getFechaDecision());
         assertEquals("Enviada", pendiente.getEstado());
         assertEquals("En Espera", candidato.getEstado());
         assertEquals(2, oferta.getVacantes());
@@ -89,6 +90,7 @@ public class SolicitudWorkflowTest {
 
         assertEquals(Solicitud.ESTADO_APROBADA, aprobada.getEstado());
         assertEquals(Solicitud.ESTADO_RECHAZADA, pendiente.getEstado());
+        assertEquals(LocalDate.now(), pendiente.getFechaDecision());
         assertEquals(Candidato.ESTADO_EMPLEADO, candidato.getEstado());
         assertTrue(candidato.getDescripcionEstadoLaboral()
                 .contains("solicitud aprobada"));
@@ -114,7 +116,9 @@ public class SolicitudWorkflowTest {
         bolsa.contratarCandidato(seleccionada);
 
         assertEquals("Aprobada", seleccionada.getEstado());
+        assertEquals(LocalDate.now(), seleccionada.getFechaDecision());
         assertEquals("Rechazada", pendiente.getEstado());
+        assertEquals(LocalDate.now(), pendiente.getFechaDecision());
         assertEquals("Empleado", candidato.getEstado());
     }
 

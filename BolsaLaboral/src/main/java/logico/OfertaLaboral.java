@@ -43,6 +43,19 @@ public class OfertaLaboral implements Serializable {
             int vacantes, CentroEmpleador ofertador, boolean ofreceReubicacion,
             boolean mayorDeEdadObligatorio, boolean obligatorioLicencia, String nivelAcademico,
             ArrayList<String> requisitos, ArrayList<String> idiomasRequeridas, int porcentajeMinimo) {
+        this(codigo, puesto, descripcion, area, modalidad, jornada, estado, salario,
+                experienciaMinima, vacantes, ofertador, ofreceReubicacion,
+                mayorDeEdadObligatorio, obligatorioLicencia, nivelAcademico,
+                TipoCandidato.desdeTextoLegado(nivelAcademico), requisitos,
+                idiomasRequeridas, porcentajeMinimo);
+    }
+
+    public OfertaLaboral(String codigo, String puesto, String descripcion, String area,
+            String modalidad, String jornada, String estado, float salario, int experienciaMinima,
+            int vacantes, CentroEmpleador ofertador, boolean ofreceReubicacion,
+            boolean mayorDeEdadObligatorio, boolean obligatorioLicencia, String nivelAcademico,
+            TipoCandidato tipoCandidatoRequerido, ArrayList<String> requisitos,
+            ArrayList<String> idiomasRequeridas, int porcentajeMinimo) {
         this.codigo = codigo;
         this.puesto = puesto;
         this.area = area;
@@ -61,7 +74,7 @@ public class OfertaLaboral implements Serializable {
         this.obligatorioMayorDeEdad = mayorDeEdadObligatorio;
         this.obligatorioLicencia = obligatorioLicencia;
         this.nivelAcademico = nivelAcademico;
-        this.tipoCandidatoRequerido = TipoCandidato.desdeTextoLegado(nivelAcademico);
+        this.tipoCandidatoRequerido = tipoCandidatoRequerido;
         this.requisitos = requisitos == null ? new ArrayList<String>() : requisitos;
         this.idiomasRequeridas = idiomasRequeridas == null
                 ? new ArrayList<String>() : idiomasRequeridas;
@@ -79,10 +92,6 @@ public class OfertaLaboral implements Serializable {
         if (!Boolean.TRUE.equals(esquemaVacantesTotales)) {
             vacantesTotales = Math.max(0, vacantes) + ocupadas;
             esquemaVacantesTotales = Boolean.TRUE;
-            cambios++;
-        }
-        if (vacantesTotales < ocupadas) {
-            vacantesTotales = ocupadas;
             cambios++;
         }
         if (vacantesOcupadas != ocupadas) {
@@ -119,9 +128,6 @@ public class OfertaLaboral implements Serializable {
 
     public void sincronizarVacantesOcupadas(int ocupadasDerivadas) {
         int ocupadas = Math.max(0, ocupadasDerivadas);
-        if (vacantesTotales < ocupadas) {
-            vacantesTotales = ocupadas;
-        }
         vacantesOcupadas = ocupadas;
         vacantes = getVacantesDisponibles();
         esquemaVacantesTotales = Boolean.TRUE;

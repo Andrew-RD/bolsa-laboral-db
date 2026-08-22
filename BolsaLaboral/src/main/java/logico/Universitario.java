@@ -78,6 +78,10 @@ public class Universitario extends Candidato implements Serializable{
 		return universidadId;
 	}
 
+	public void setUniversidadId(Integer universidadId) {
+		this.universidadId = universidadId;
+	}
+
 	public void setUniversidadCatalogo(ElementoCatalogo universidadCatalogo) {
 		if (universidadCatalogo == null) {
 			universidadId = null;

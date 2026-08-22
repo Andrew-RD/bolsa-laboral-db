@@ -239,10 +239,17 @@ public abstract class Candidato implements Serializable{
 	 * modifica aquí.
 	 */
 	public void cambiarEstadoSolicitudesAEmpleado() {
+		cambiarEstadoSolicitudesAEmpleado(null);
+	}
+
+	public void cambiarEstadoSolicitudesAEmpleado(LocalDate fechaDecision) {
 		if (misSolicitudes != null) {
 			for (Solicitud solicitud : misSolicitudes) {
 				if (solicitud != null && Solicitud.ESTADO_ENVIADA.equals(solicitud.getEstado())) {
 					solicitud.setEstado(Solicitud.ESTADO_RECHAZADA);
+					if (fechaDecision != null) {
+						solicitud.setFechaDecision(fechaDecision);
+					}
 				}
 			}
 		}
@@ -267,7 +274,7 @@ public abstract class Candidato implements Serializable{
 				}
 				String estadoSolicitud = solicitud.getEstado();
 				String estadoNormalizado = estadoSolicitud == null ? null : estadoSolicitud.trim();
-				if (Solicitud.ESTADO_APROBADA.equals(estadoNormalizado)) {
+				if (Solicitud.esEstadoAprobada(estadoNormalizado)) {
 					tieneAprobada = true;
 				} else if (Solicitud.ESTADO_ENVIADA.equals(estadoNormalizado)) {
 					tieneEnviada = true;
