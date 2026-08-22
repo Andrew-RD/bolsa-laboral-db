@@ -80,6 +80,10 @@ public class Principal extends JFrame {
                 item("  Informe", "informes.png",
                         event -> openAuthorized(Permiso.VER_INFORMES,
                                 () -> new InformeGeneral())));
+        addAuthorized(mnGestion, Permiso.VER_INFORMES,
+                item("  Consultas gerenciales", "informes.png",
+                        event -> openAuthorized(Permiso.VER_INFORMES,
+                                () -> new ConsultasGerenciales())));
         addAuthorized(mnGestion, Permiso.GESTIONAR_CATALOGOS,
                 item("  Catálogos", "gestion.png",
                         event -> openAuthorized(Permiso.GESTIONAR_CATALOGOS,
