@@ -1,51 +1,48 @@
 package logico;
 
-/** Resultado agregado de tasa de éxito de contratación para un centro empleador. */
+/** Resultado agregado de conversión de oportunidades para un centro empleador. */
 public class TasaExitoCentroDTO {
 
-    public static final String DIAGNOSTICO_ALTO = "Alto desempeño";
-    public static final String DIAGNOSTICO_MODERADO = "Desempeño moderado";
-    public static final String DIAGNOSTICO_BAJO = "Bajo desempeño";
-
-    private static final double UMBRAL_ALTO = 15;
-    private static final double UMBRAL_MODERADO = 5;
+    public static final String DIAGNOSTICO_SIN_CONVERSIONES = "Sin conversiones";
+    public static final String DIAGNOSTICO_CONVERSION_PARCIAL = "Conversión parcial";
+    public static final String DIAGNOSTICO_CONVERSION_TOTAL = "Conversión total";
 
     private final String centroEmpleador;
-    private final int solicitudesRecibidas;
+    private final int oportunidadesEnviadas;
     private final int contrataciones;
-    private final double tasaExito;
+    private final double tasaConversion;
 
-    public TasaExitoCentroDTO(String centroEmpleador, int solicitudesRecibidas,
-                              int contrataciones, double tasaExito) {
+    public TasaExitoCentroDTO(String centroEmpleador, int oportunidadesEnviadas,
+                              int contrataciones, double tasaConversion) {
         this.centroEmpleador = centroEmpleador;
-        this.solicitudesRecibidas = solicitudesRecibidas;
+        this.oportunidadesEnviadas = oportunidadesEnviadas;
         this.contrataciones = contrataciones;
-        this.tasaExito = tasaExito;
+        this.tasaConversion = tasaConversion;
     }
 
     public String getCentroEmpleador() {
         return centroEmpleador;
     }
 
-    public int getSolicitudesRecibidas() {
-        return solicitudesRecibidas;
+    public int getOportunidadesEnviadas() {
+        return oportunidadesEnviadas;
     }
 
     public int getContrataciones() {
         return contrataciones;
     }
 
-    public double getTasaExito() {
-        return tasaExito;
+    public double getTasaConversion() {
+        return tasaConversion;
     }
 
     public String getDiagnostico() {
-        if (tasaExito >= UMBRAL_ALTO) {
-            return DIAGNOSTICO_ALTO;
+        if (tasaConversion <= 0) {
+            return DIAGNOSTICO_SIN_CONVERSIONES;
         }
-        if (tasaExito >= UMBRAL_MODERADO) {
-            return DIAGNOSTICO_MODERADO;
+        if (tasaConversion >= 100) {
+            return DIAGNOSTICO_CONVERSION_TOTAL;
         }
-        return DIAGNOSTICO_BAJO;
+        return DIAGNOSTICO_CONVERSION_PARCIAL;
     }
 }

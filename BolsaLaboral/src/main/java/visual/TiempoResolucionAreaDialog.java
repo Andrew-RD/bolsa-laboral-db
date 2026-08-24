@@ -1,6 +1,6 @@
 package visual;
 
-import logico.TasaExitoCentroDTO;
+import logico.TiempoResolucionAreaDTO;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -23,16 +23,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-class TasaExitoCentroDialog extends JDialog {
+class TiempoResolucionAreaDialog extends JDialog {
 
-    TasaExitoCentroDialog(Window owner, List<TasaExitoCentroDTO> resultados) {
-        super(owner, "Tasa de conversión de oportunidades por centro empleador",
+    TiempoResolucionAreaDialog(Window owner, List<TiempoResolucionAreaDTO> resultados) {
+        super(owner, "Tiempo promedio de resolución de vinculaciones por área laboral",
                 Dialog.ModalityType.APPLICATION_MODAL);
         setIconImage(UIUtils.image("icono.png"));
 
-        List<TasaExitoCentroDTO> datos = resultados == null
-                ? Collections.<TasaExitoCentroDTO>emptyList()
-                : new ArrayList<TasaExitoCentroDTO>(resultados);
+        List<TiempoResolucionAreaDTO> datos = resultados == null
+                ? Collections.<TiempoResolucionAreaDTO>emptyList()
+                : new ArrayList<TiempoResolucionAreaDTO>(resultados);
 
         JPanel content = new JPanel(new BorderLayout(UIUtils.scale(10), UIUtils.scale(10)));
         content.setBackground(UIUtils.SURFACE);
@@ -43,7 +43,7 @@ class TasaExitoCentroDialog extends JDialog {
         JTabbedPane tabs = new JTabbedPane();
         tabs.setFont(UIUtils.largeFont(Font.BOLD));
         tabs.addTab("Tabla", crearPestanaTabla(datos));
-        JScrollPane graficoScroll = UIUtils.scrollable(new TasaExitoCentroGrafico(datos));
+        JScrollPane graficoScroll = UIUtils.scrollable(new TiempoResolucionAreaGrafico(datos));
         graficoScroll.getViewport().setBackground(Color.WHITE);
         tabs.addTab("Gráfico", graficoScroll);
 
@@ -59,62 +59,63 @@ class TasaExitoCentroDialog extends JDialog {
         pie.add(cerrar);
         content.add(pie, BorderLayout.SOUTH);
 
-        UIUtils.finishDialog(this, owner, 1040, 680);
+        UIUtils.finishDialog(this, owner, 1120, 700);
     }
 
     private JPanel crearEncabezado() {
         JPanel encabezado = new JPanel(new FlowLayout(
                 FlowLayout.LEFT, UIUtils.scale(16), UIUtils.scale(14)));
         encabezado.setBackground(UIUtils.TEAL_DARK);
-        JLabel titulo = new JLabel("Tasa de conversión de oportunidades por centro empleador");
+        JLabel titulo = new JLabel(
+                "Tiempo promedio de resolución de vinculaciones por área laboral");
         titulo.setForeground(Color.WHITE);
         titulo.setFont(UIUtils.h2Font(Font.BOLD));
         encabezado.add(titulo);
         return encabezado;
     }
 
-    private JPanel crearPestanaTabla(List<TasaExitoCentroDTO> resultados) {
+    private JPanel crearPestanaTabla(List<TiempoResolucionAreaDTO> resultados) {
         JPanel panel = new JPanel(new BorderLayout(UIUtils.scale(8), UIUtils.scale(8)));
         panel.setBackground(UIUtils.SURFACE);
         panel.setBorder(UIUtils.emptyBorder(10, 10, 10, 10));
         panel.add(crearIndicadores(resultados), BorderLayout.NORTH);
 
-        JTable tabla = new JTable(new TasaExitoCentroTableModel(resultados));
+        JTable tabla = new JTable(new TiempoResolucionAreaTableModel(resultados));
         UIUtils.configureTable(tabla);
         tabla.setAutoCreateRowSorter(true);
+        tabla.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         alinearNumeros(tabla);
-        tabla.getColumnModel().getColumn(0).setPreferredWidth(UIUtils.scale(220));
-        tabla.getColumnModel().getColumn(1).setPreferredWidth(UIUtils.scale(180));
-        tabla.getColumnModel().getColumn(2).setPreferredWidth(UIUtils.scale(125));
-        tabla.getColumnModel().getColumn(3).setPreferredWidth(UIUtils.scale(180));
-        tabla.getColumnModel().getColumn(4).setPreferredWidth(UIUtils.scale(170));
+        int[] anchos = {180, 165, 165, 170, 145, 125, 120, 170};
+        for (int columna = 0; columna < anchos.length; columna++) {
+            tabla.getColumnModel().getColumn(columna).setPreferredWidth(
+                    UIUtils.scale(anchos[columna]));
+        }
         panel.add(new JScrollPane(tabla), BorderLayout.CENTER);
         return panel;
     }
 
-    private JPanel crearIndicadores(List<TasaExitoCentroDTO> resultados) {
+    private JPanel crearIndicadores(List<TiempoResolucionAreaDTO> resultados) {
         int oportunidades = 0;
-        int contrataciones = 0;
-        int centrosSinContrataciones = 0;
-        for (TasaExitoCentroDTO resultado : resultados) {
+        int resueltas = 0;
+        int pendientes = 0;
+        double diasPonderados = 0.0;
+        for (TiempoResolucionAreaDTO resultado : resultados) {
             oportunidades += resultado.getOportunidadesEnviadas();
-            contrataciones += resultado.getContrataciones();
-            if (resultado.getContrataciones() == 0) {
-                centrosSinContrataciones++;
-            }
+            resueltas += resultado.getVinculacionesResueltas();
+            pendientes += resultado.getVinculacionesPendientes();
+            diasPonderados += resultado.getDiasPromedioResolucion()
+                    * resultado.getVinculacionesResueltas();
         }
-        double tasaGlobal = oportunidades == 0 ? 0.0
-                : (contrataciones * 100.0) / oportunidades;
+        double promedioGlobal = resueltas == 0 ? 0.0 : diasPonderados / resueltas;
 
         JPanel indicadores = new JPanel(new GridLayout(1, 4,
                 UIUtils.scale(10), UIUtils.scale(10)));
         indicadores.setOpaque(false);
         indicadores.add(crearIndicador("Oportunidades enviadas", String.valueOf(oportunidades)));
-        indicadores.add(crearIndicador("Contrataciones", String.valueOf(contrataciones)));
-        indicadores.add(crearIndicador("Tasa de conversión global",
-                String.format("%.2f%%", tasaGlobal)));
-        indicadores.add(crearIndicador("Centros sin contrataciones",
-                String.valueOf(centrosSinContrataciones)));
+        indicadores.add(crearIndicador("Vinculaciones resueltas", String.valueOf(resueltas)));
+        indicadores.add(crearIndicador("Vinculaciones pendientes", String.valueOf(pendientes)));
+        indicadores.add(crearIndicador("Promedio global (días)",
+                String.format("%.2f", promedioGlobal)));
         return indicadores;
     }
 
@@ -135,18 +136,28 @@ class TasaExitoCentroDialog extends JDialog {
     }
 
     private void alinearNumeros(JTable tabla) {
-        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-        renderer.setHorizontalAlignment(SwingConstants.RIGHT);
-        tabla.getColumnModel().getColumn(1).setCellRenderer(renderer);
-        tabla.getColumnModel().getColumn(2).setCellRenderer(renderer);
+        DefaultTableCellRenderer numero = new DefaultTableCellRenderer();
+        numero.setHorizontalAlignment(SwingConstants.RIGHT);
+        for (int columna = 1; columna <= 4; columna++) {
+            tabla.getColumnModel().getColumn(columna).setCellRenderer(numero);
+        }
 
-        DefaultTableCellRenderer rendererTasa = new DefaultTableCellRenderer() {
+        DefaultTableCellRenderer decimal = new DefaultTableCellRenderer() {
+            @Override
+            protected void setValue(Object value) {
+                setText(value == null ? "" : String.format("%.2f", (Double) value));
+            }
+        };
+        decimal.setHorizontalAlignment(SwingConstants.RIGHT);
+        tabla.getColumnModel().getColumn(5).setCellRenderer(decimal);
+
+        DefaultTableCellRenderer porcentaje = new DefaultTableCellRenderer() {
             @Override
             protected void setValue(Object value) {
                 setText(value == null ? "" : String.format("%.2f%%", (Double) value));
             }
         };
-        rendererTasa.setHorizontalAlignment(SwingConstants.RIGHT);
-        tabla.getColumnModel().getColumn(3).setCellRenderer(rendererTasa);
+        porcentaje.setHorizontalAlignment(SwingConstants.RIGHT);
+        tabla.getColumnModel().getColumn(6).setCellRenderer(porcentaje);
     }
 }

@@ -1,25 +1,26 @@
 package visual;
 
-import logico.TasaExitoCentroDTO;
+import logico.TiempoResolucionAreaDTO;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class TasaExitoCentroTableModel extends AbstractTableModel {
+public class TiempoResolucionAreaTableModel extends AbstractTableModel {
 
     private static final String[] COLUMNAS = {
-            "Centro empleador", "Oportunidades enviadas", "Contrataciones",
-            "Tasa de conversión (%)", "Diagnóstico"
+            "Área laboral", "Oportunidades enviadas", "Vinculaciones resueltas",
+            "Vinculaciones pendientes", "Pendientes > 7 días", "Promedio (días)",
+            "Resolución (%)", "Diagnóstico"
     };
 
-    private final List<TasaExitoCentroDTO> resultados;
+    private final List<TiempoResolucionAreaDTO> resultados;
 
-    public TasaExitoCentroTableModel(List<TasaExitoCentroDTO> resultados) {
+    public TiempoResolucionAreaTableModel(List<TiempoResolucionAreaDTO> resultados) {
         this.resultados = resultados == null
-                ? Collections.<TasaExitoCentroDTO>emptyList()
-                : new ArrayList<TasaExitoCentroDTO>(resultados);
+                ? Collections.<TiempoResolucionAreaDTO>emptyList()
+                : new ArrayList<TiempoResolucionAreaDTO>(resultados);
     }
 
     @Override
@@ -39,10 +40,10 @@ public class TasaExitoCentroTableModel extends AbstractTableModel {
 
     @Override
     public Class<?> getColumnClass(int columnIndex) {
-        if (columnIndex == 1 || columnIndex == 2) {
+        if (columnIndex >= 1 && columnIndex <= 4) {
             return Integer.class;
         }
-        if (columnIndex == 3) {
+        if (columnIndex == 5 || columnIndex == 6) {
             return Double.class;
         }
         return String.class;
@@ -50,17 +51,23 @@ public class TasaExitoCentroTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
-        TasaExitoCentroDTO resultado = resultados.get(rowIndex);
+        TiempoResolucionAreaDTO resultado = resultados.get(rowIndex);
         switch (columnIndex) {
             case 0:
-                return resultado.getCentroEmpleador();
+                return resultado.getAreaLaboral();
             case 1:
                 return Integer.valueOf(resultado.getOportunidadesEnviadas());
             case 2:
-                return Integer.valueOf(resultado.getContrataciones());
+                return Integer.valueOf(resultado.getVinculacionesResueltas());
             case 3:
-                return Double.valueOf(resultado.getTasaConversion());
+                return Integer.valueOf(resultado.getVinculacionesPendientes());
             case 4:
+                return Integer.valueOf(resultado.getPendientesMasSieteDias());
+            case 5:
+                return Double.valueOf(resultado.getDiasPromedioResolucion());
+            case 6:
+                return Double.valueOf(resultado.getPorcentajeResolucion());
+            case 7:
                 return resultado.getDiagnostico();
             default:
                 throw new IndexOutOfBoundsException("Columna no válida: " + columnIndex);

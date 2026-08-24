@@ -85,6 +85,9 @@ class ManoObraMunicipioDialog extends JDialog {
         alinearNumeros(tabla);
         tabla.getColumnModel().getColumn(0).setPreferredWidth(UIUtils.scale(150));
         tabla.getColumnModel().getColumn(1).setPreferredWidth(UIUtils.scale(150));
+        tabla.getColumnModel().getColumn(2).setPreferredWidth(UIUtils.scale(180));
+        tabla.getColumnModel().getColumn(3).setPreferredWidth(UIUtils.scale(160));
+        tabla.getColumnModel().getColumn(4).setPreferredWidth(UIUtils.scale(100));
         tabla.getColumnModel().getColumn(5).setPreferredWidth(UIUtils.scale(190));
         panel.add(new JScrollPane(tabla), BorderLayout.CENTER);
         return panel;

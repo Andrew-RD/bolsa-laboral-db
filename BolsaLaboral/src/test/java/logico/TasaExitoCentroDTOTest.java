@@ -7,23 +7,28 @@ import static org.junit.Assert.assertEquals;
 public class TasaExitoCentroDTOTest {
 
     @Test
-    public void tasaMenorA5IndicaBajoDesempeno() {
-        TasaExitoCentroDTO resultado = new TasaExitoCentroDTO("Centro A", 100, 2, 2.0);
+    public void tasaCeroIndicaSinConversiones() {
+        TasaExitoCentroDTO resultado = new TasaExitoCentroDTO("Centro A", 10, 0, 0.0);
 
-        assertEquals(TasaExitoCentroDTO.DIAGNOSTICO_BAJO, resultado.getDiagnostico());
+        assertEquals(TasaExitoCentroDTO.DIAGNOSTICO_SIN_CONVERSIONES,
+                resultado.getDiagnostico());
     }
 
     @Test
-    public void tasaEntre5Y15IndicaDesempenoModerado() {
-        TasaExitoCentroDTO resultado = new TasaExitoCentroDTO("Centro B", 100, 10, 10.0);
+    public void tasaIntermediaIndicaConversionParcial() {
+        TasaExitoCentroDTO resultado = new TasaExitoCentroDTO("Centro B", 3, 1, 33.33);
 
-        assertEquals(TasaExitoCentroDTO.DIAGNOSTICO_MODERADO, resultado.getDiagnostico());
+        assertEquals(33.33, resultado.getTasaConversion(), 0.001);
+        assertEquals(TasaExitoCentroDTO.DIAGNOSTICO_CONVERSION_PARCIAL,
+                resultado.getDiagnostico());
     }
 
     @Test
-    public void tasaDe15OMasIndicaAltoDesempeno() {
-        TasaExitoCentroDTO resultado = new TasaExitoCentroDTO("Centro C", 100, 20, 20.0);
+    public void tasaCienIndicaConversionTotal() {
+        TasaExitoCentroDTO resultado = new TasaExitoCentroDTO("Centro C", 4, 4, 100.0);
 
-        assertEquals(TasaExitoCentroDTO.DIAGNOSTICO_ALTO, resultado.getDiagnostico());
+        assertEquals(4, resultado.getOportunidadesEnviadas());
+        assertEquals(TasaExitoCentroDTO.DIAGNOSTICO_CONVERSION_TOTAL,
+                resultado.getDiagnostico());
     }
 }

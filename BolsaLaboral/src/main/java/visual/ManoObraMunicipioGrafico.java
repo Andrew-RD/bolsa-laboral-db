@@ -23,7 +23,6 @@ class ManoObraMunicipioGrafico extends JPanel implements Scrollable {
     private static final int ALTO_FILA = 58;
     private static final int MARGEN_SUPERIOR = 74;
     private static final int MARGEN_INFERIOR = 36;
-    private static final int MARGEN_DERECHO = 58;
 
     private final List<ManoObraMunicipioDTO> resultados;
 
@@ -33,6 +32,7 @@ class ManoObraMunicipioGrafico extends JPanel implements Scrollable {
                 : new ArrayList<ManoObraMunicipioDTO>(resultados);
         setBackground(Color.WHITE);
         setOpaque(true);
+        setToolTipText("Los nombres abreviados se muestran completos en la pestaña Tabla.");
         setPreferredSize(UIUtils.dimension(900,
                 Math.max(420, MARGEN_SUPERIOR + MARGEN_INFERIOR
                         + this.resultados.size() * ALTO_FILA)));
@@ -58,10 +58,16 @@ class ManoObraMunicipioGrafico extends JPanel implements Scrollable {
             }
 
             dibujarLeyenda(g2);
-            int margenIzquierdo = calcularMargenIzquierdo(g2);
-            int anchoDisponible = Math.max(UIUtils.scale(80),
-                    getWidth() - margenIzquierdo - UIUtils.scale(MARGEN_DERECHO));
+            FontMetrics metrics = g2.getFontMetrics();
+            List<String> etiquetas = etiquetas();
+            int margenIzquierdo = GraficoBarrasUtils.calcularMargenIzquierdo(
+                    metrics, etiquetas);
             int maximo = valorMaximo();
+            int finValores = getWidth() - UIUtils.scale(16);
+            int anchoValores = GraficoBarrasUtils.anchoColumna(metrics,
+                    Collections.singletonList(String.valueOf(maximo)), 44);
+            int finBarras = Math.max(margenIzquierdo,
+                    finValores - anchoValores - UIUtils.scale(10));
             int altoBarra = UIUtils.scale(15);
             int separacion = UIUtils.scale(4);
 
@@ -72,12 +78,15 @@ class ManoObraMunicipioGrafico extends JPanel implements Scrollable {
             for (int index = 0; index < resultados.size(); index++) {
                 ManoObraMunicipioDTO resultado = resultados.get(index);
                 int y = UIUtils.scale(MARGEN_SUPERIOR + index * ALTO_FILA);
-                dibujarMunicipio(g2, etiqueta(resultado), margenIzquierdo, y + altoBarra);
-                dibujarBarra(g2, margenIzquierdo, y, anchoDisponible, altoBarra,
-                        resultado.getCandidatosDesempleados(), maximo, COLOR_CANDIDATOS);
-                dibujarBarra(g2, margenIzquierdo, y + altoBarra + separacion,
-                        anchoDisponible, altoBarra, resultado.getVacantesDisponibles(),
-                        maximo, COLOR_VACANTES);
+                GraficoBarrasUtils.dibujarEtiqueta(g2, etiquetas.get(index),
+                        margenIzquierdo, y + altoBarra);
+                GraficoBarrasUtils.dibujarBarra(g2, margenIzquierdo, y, finBarras,
+                        altoBarra, resultado.getCandidatosDesempleados(), maximo,
+                        COLOR_CANDIDATOS, finValores);
+                GraficoBarrasUtils.dibujarBarra(g2, margenIzquierdo,
+                        y + altoBarra + separacion, finBarras, altoBarra,
+                        resultado.getVacantesDisponibles(), maximo,
+                        COLOR_VACANTES, finValores);
             }
         } finally {
             g2.dispose();
@@ -101,44 +110,18 @@ class ManoObraMunicipioGrafico extends JPanel implements Scrollable {
         g2.drawString("Vacantes disponibles", x + cuadro + UIUtils.scale(6), y + cuadro - 1);
     }
 
-    private int calcularMargenIzquierdo(Graphics2D g2) {
-        FontMetrics metrics = g2.getFontMetrics();
-        int maximo = UIUtils.scale(150);
+    private List<String> etiquetas() {
+        ArrayList<String> etiquetas = new ArrayList<String>();
         for (ManoObraMunicipioDTO resultado : resultados) {
-            maximo = Math.max(maximo, metrics.stringWidth(etiqueta(resultado)) + UIUtils.scale(28));
+            etiquetas.add(etiqueta(resultado));
         }
-        return Math.min(maximo, UIUtils.scale(340));
+        return etiquetas;
     }
 
     private String etiqueta(ManoObraMunicipioDTO resultado) {
         String municipio = resultado.getMunicipio() == null ? "Sin nombre" : resultado.getMunicipio();
         String provincia = resultado.getProvincia();
         return provincia == null ? municipio : municipio + " (" + provincia + ")";
-    }
-
-    private void dibujarMunicipio(Graphics2D g2, String etiqueta, int margenIzquierdo, int y) {
-        String texto = etiqueta;
-        FontMetrics metrics = g2.getFontMetrics();
-        int anchoMaximo = margenIzquierdo - UIUtils.scale(20);
-        while (texto.length() > 1 && metrics.stringWidth(texto) > anchoMaximo) {
-            texto = texto.substring(0, texto.length() - 1);
-        }
-        if (!texto.equals(etiqueta)) {
-            texto = texto.length() > 3 ? texto.substring(0, texto.length() - 3) + "..." : texto;
-        }
-        g2.setColor(Color.DARK_GRAY);
-        g2.drawString(texto, UIUtils.scale(12), y);
-    }
-
-    private void dibujarBarra(Graphics2D g2, int x, int y, int anchoDisponible,
-                              int alto, int valor, int maximo, Color color) {
-        int ancho = valor == 0 ? 0
-                : Math.max(UIUtils.scale(2), Math.round(anchoDisponible * valor / (float) maximo));
-        g2.setColor(color);
-        g2.fillRoundRect(x, y, ancho, alto, UIUtils.scale(4), UIUtils.scale(4));
-        g2.setColor(Color.DARK_GRAY);
-        g2.drawString(String.valueOf(valor), x + ancho + UIUtils.scale(6),
-                y + alto - UIUtils.scale(2));
     }
 
     private int valorMaximo() {

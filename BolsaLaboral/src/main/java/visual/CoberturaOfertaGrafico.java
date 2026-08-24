@@ -1,6 +1,6 @@
 package visual;
 
-import logico.BrechaOfertaDemandaDTO;
+import logico.CoberturaOfertaDTO;
 
 import javax.swing.JPanel;
 import javax.swing.Scrollable;
@@ -16,24 +16,24 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-class BrechaOfertaDemandaGrafico extends JPanel implements Scrollable {
+class CoberturaOfertaGrafico extends JPanel implements Scrollable {
 
-    private static final Color COLOR_OFERTAS = UIUtils.TEAL;
-    private static final Color COLOR_CANDIDATOS = UIUtils.CANDIDATE_GREEN;
+    private static final Color COLOR_OCUPADAS = UIUtils.CANDIDATE_GREEN;
+    private static final Color COLOR_PENDIENTES = UIUtils.TEAL;
     private static final int ALTO_FILA = 58;
     private static final int MARGEN_SUPERIOR = 74;
     private static final int MARGEN_INFERIOR = 36;
 
-    private final List<BrechaOfertaDemandaDTO> resultados;
+    private final List<CoberturaOfertaDTO> resultados;
 
-    BrechaOfertaDemandaGrafico(List<BrechaOfertaDemandaDTO> resultados) {
+    CoberturaOfertaGrafico(List<CoberturaOfertaDTO> resultados) {
         this.resultados = resultados == null
-                ? Collections.<BrechaOfertaDemandaDTO>emptyList()
-                : new ArrayList<BrechaOfertaDemandaDTO>(resultados);
+                ? Collections.<CoberturaOfertaDTO>emptyList()
+                : new ArrayList<CoberturaOfertaDTO>(resultados);
         setBackground(Color.WHITE);
         setOpaque(true);
         setToolTipText("Los nombres abreviados se muestran completos en la pestaña Tabla.");
-        setPreferredSize(UIUtils.dimension(900,
+        setPreferredSize(UIUtils.dimension(950,
                 Math.max(420, MARGEN_SUPERIOR + MARGEN_INFERIOR
                         + this.resultados.size() * ALTO_FILA)));
     }
@@ -46,14 +46,8 @@ class BrechaOfertaDemandaGrafico extends JPanel implements Scrollable {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                     RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setFont(UIUtils.defaultFont(Font.PLAIN));
-
             if (resultados.isEmpty()) {
-                g2.setColor(Color.DARK_GRAY);
-                String mensaje = "No existen resultados para representar.";
-                FontMetrics metrics = g2.getFontMetrics();
-                g2.drawString(mensaje, Math.max(UIUtils.scale(16),
-                                (getWidth() - metrics.stringWidth(mensaje)) / 2),
-                        Math.max(UIUtils.scale(40), getHeight() / 2));
+                dibujarSinResultados(g2);
                 return;
             }
 
@@ -76,17 +70,17 @@ class BrechaOfertaDemandaGrafico extends JPanel implements Scrollable {
                     margenIzquierdo, getHeight() - UIUtils.scale(MARGEN_INFERIOR));
 
             for (int index = 0; index < resultados.size(); index++) {
-                BrechaOfertaDemandaDTO resultado = resultados.get(index);
+                CoberturaOfertaDTO resultado = resultados.get(index);
                 int y = UIUtils.scale(MARGEN_SUPERIOR + index * ALTO_FILA);
                 GraficoBarrasUtils.dibujarEtiqueta(g2, etiquetas.get(index),
                         margenIzquierdo, y + altoBarra);
                 GraficoBarrasUtils.dibujarBarra(g2, margenIzquierdo, y, finBarras,
-                        altoBarra, resultado.getOfertasActivas(), maximo,
-                        COLOR_OFERTAS, finValores);
+                        altoBarra, resultado.getVacantesOcupadas(), maximo,
+                        COLOR_OCUPADAS, finValores);
                 GraficoBarrasUtils.dibujarBarra(g2, margenIzquierdo,
                         y + altoBarra + separacion, finBarras, altoBarra,
-                        resultado.getCandidatosDesempleados(), maximo,
-                        COLOR_CANDIDATOS, finValores);
+                        resultado.getVacantesPendientes(), maximo,
+                        COLOR_PENDIENTES, finValores);
             }
         } finally {
             g2.dispose();
@@ -97,39 +91,48 @@ class BrechaOfertaDemandaGrafico extends JPanel implements Scrollable {
         int y = UIUtils.scale(24);
         int cuadro = UIUtils.scale(14);
         int x = UIUtils.scale(24);
-        g2.setColor(COLOR_OFERTAS);
+        g2.setColor(COLOR_OCUPADAS);
         g2.fillRoundRect(x, y, cuadro, cuadro, UIUtils.scale(3), UIUtils.scale(3));
         g2.setColor(Color.DARK_GRAY);
-        g2.drawString("Ofertas activas", x + cuadro + UIUtils.scale(6), y + cuadro - 1);
-
-        x += UIUtils.scale(150);
-        g2.setColor(COLOR_CANDIDATOS);
+        g2.drawString("Vacantes ocupadas", x + cuadro + UIUtils.scale(6), y + cuadro - 1);
+        x += UIUtils.scale(170);
+        g2.setColor(COLOR_PENDIENTES);
         g2.fillRoundRect(x, y, cuadro, cuadro, UIUtils.scale(3), UIUtils.scale(3));
         g2.setColor(Color.DARK_GRAY);
-        g2.drawString("Candidatos desempleados",
-                x + cuadro + UIUtils.scale(6), y + cuadro - 1);
+        g2.drawString("Vacantes pendientes", x + cuadro + UIUtils.scale(6), y + cuadro - 1);
     }
 
     private List<String> etiquetas() {
         ArrayList<String> etiquetas = new ArrayList<String>();
-        for (BrechaOfertaDemandaDTO resultado : resultados) {
-            etiquetas.add(resultado.getAreaLaboral());
+        for (CoberturaOfertaDTO resultado : resultados) {
+            String oferta = resultado.getOferta() == null ? "Sin nombre" : resultado.getOferta();
+            String centro = resultado.getCentroEmpleador();
+            etiquetas.add(centro == null ? oferta : oferta + " — " + centro);
         }
         return etiquetas;
     }
 
     private int valorMaximo() {
         int maximo = 1;
-        for (BrechaOfertaDemandaDTO resultado : resultados) {
-            maximo = Math.max(maximo, resultado.getOfertasActivas());
-            maximo = Math.max(maximo, resultado.getCandidatosDesempleados());
+        for (CoberturaOfertaDTO resultado : resultados) {
+            maximo = Math.max(maximo, resultado.getVacantesOcupadas());
+            maximo = Math.max(maximo, resultado.getVacantesPendientes());
         }
         return maximo;
     }
 
+    private void dibujarSinResultados(Graphics2D g2) {
+        String mensaje = "No existen resultados para representar.";
+        FontMetrics metrics = g2.getFontMetrics();
+        g2.setColor(Color.DARK_GRAY);
+        g2.drawString(mensaje, Math.max(UIUtils.scale(16),
+                        (getWidth() - metrics.stringWidth(mensaje)) / 2),
+                Math.max(UIUtils.scale(40), getHeight() / 2));
+    }
+
     @Override
     public Dimension getPreferredScrollableViewportSize() {
-        return UIUtils.dimension(900, 500);
+        return UIUtils.dimension(950, 520);
     }
 
     @Override

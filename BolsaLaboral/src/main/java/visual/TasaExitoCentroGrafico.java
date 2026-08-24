@@ -18,12 +18,11 @@ import java.util.List;
 
 class TasaExitoCentroGrafico extends JPanel implements Scrollable {
 
-    private static final Color COLOR_SOLICITUDES = UIUtils.CANDIDATE_GREEN;
+    private static final Color COLOR_OPORTUNIDADES = UIUtils.CANDIDATE_GREEN;
     private static final Color COLOR_CONTRATACIONES = UIUtils.TEAL;
     private static final int ALTO_FILA = 58;
     private static final int MARGEN_SUPERIOR = 74;
     private static final int MARGEN_INFERIOR = 36;
-    private static final int MARGEN_DERECHO = 90;
 
     private final List<TasaExitoCentroDTO> resultados;
 
@@ -33,6 +32,7 @@ class TasaExitoCentroGrafico extends JPanel implements Scrollable {
                 : new ArrayList<TasaExitoCentroDTO>(resultados);
         setBackground(Color.WHITE);
         setOpaque(true);
+        setToolTipText("Los nombres abreviados se muestran completos en la pestaña Tabla.");
         setPreferredSize(UIUtils.dimension(900,
                 Math.max(420, MARGEN_SUPERIOR + MARGEN_INFERIOR
                         + this.resultados.size() * ALTO_FILA)));
@@ -58,10 +58,21 @@ class TasaExitoCentroGrafico extends JPanel implements Scrollable {
             }
 
             dibujarLeyenda(g2);
-            int margenIzquierdo = calcularMargenIzquierdo(g2);
-            int anchoDisponible = Math.max(UIUtils.scale(80),
-                    getWidth() - margenIzquierdo - UIUtils.scale(MARGEN_DERECHO));
+            FontMetrics metrics = g2.getFontMetrics();
+            List<String> etiquetas = etiquetas();
+            List<String> porcentajes = porcentajes();
+            int margenIzquierdo = GraficoBarrasUtils.calcularMargenIzquierdo(
+                    metrics, etiquetas);
             int maximo = valorMaximo();
+            int finPorcentajes = getWidth() - UIUtils.scale(16);
+            int anchoPorcentajes = GraficoBarrasUtils.anchoColumna(
+                    metrics, porcentajes, 76);
+            int inicioPorcentajes = finPorcentajes - anchoPorcentajes;
+            int finValores = inicioPorcentajes - UIUtils.scale(12);
+            int anchoValores = GraficoBarrasUtils.anchoColumna(metrics,
+                    Collections.singletonList(String.valueOf(maximo)), 44);
+            int finBarras = Math.max(margenIzquierdo,
+                    finValores - anchoValores - UIUtils.scale(10));
             int altoBarra = UIUtils.scale(15);
             int separacion = UIUtils.scale(4);
 
@@ -72,14 +83,16 @@ class TasaExitoCentroGrafico extends JPanel implements Scrollable {
             for (int index = 0; index < resultados.size(); index++) {
                 TasaExitoCentroDTO resultado = resultados.get(index);
                 int y = UIUtils.scale(MARGEN_SUPERIOR + index * ALTO_FILA);
-                dibujarCentro(g2, resultado.getCentroEmpleador(), margenIzquierdo, y + altoBarra);
-                dibujarBarra(g2, margenIzquierdo, y, anchoDisponible, altoBarra,
-                        resultado.getSolicitudesRecibidas(), maximo, COLOR_SOLICITUDES);
-                dibujarBarra(g2, margenIzquierdo, y + altoBarra + separacion,
-                        anchoDisponible, altoBarra, resultado.getContrataciones(),
-                        maximo, COLOR_CONTRATACIONES);
-                dibujarTasa(g2, resultado.getTasaExito(),
-                        margenIzquierdo + anchoDisponible, y + altoBarra);
+                GraficoBarrasUtils.dibujarEtiqueta(g2, etiquetas.get(index),
+                        margenIzquierdo, y + altoBarra);
+                GraficoBarrasUtils.dibujarBarra(g2, margenIzquierdo, y, finBarras,
+                        altoBarra, resultado.getOportunidadesEnviadas(), maximo,
+                        COLOR_OPORTUNIDADES, finValores);
+                GraficoBarrasUtils.dibujarBarra(g2, margenIzquierdo,
+                        y + altoBarra + separacion, finBarras, altoBarra,
+                        resultado.getContrataciones(), maximo,
+                        COLOR_CONTRATACIONES, finValores);
+                dibujarTasa(g2, porcentajes.get(index), finPorcentajes, y + altoBarra);
             }
         } finally {
             g2.dispose();
@@ -90,10 +103,10 @@ class TasaExitoCentroGrafico extends JPanel implements Scrollable {
         int y = UIUtils.scale(24);
         int cuadro = UIUtils.scale(14);
         int x = UIUtils.scale(24);
-        g2.setColor(COLOR_SOLICITUDES);
+        g2.setColor(COLOR_OPORTUNIDADES);
         g2.fillRoundRect(x, y, cuadro, cuadro, UIUtils.scale(3), UIUtils.scale(3));
         g2.setColor(Color.DARK_GRAY);
-        g2.drawString("Solicitudes recibidas",
+        g2.drawString("Oportunidades enviadas",
                 x + cuadro + UIUtils.scale(6), y + cuadro - 1);
 
         x += UIUtils.scale(190);
@@ -103,14 +116,12 @@ class TasaExitoCentroGrafico extends JPanel implements Scrollable {
         g2.drawString("Contrataciones", x + cuadro + UIUtils.scale(6), y + cuadro - 1);
     }
 
-    private int calcularMargenIzquierdo(Graphics2D g2) {
-        FontMetrics metrics = g2.getFontMetrics();
-        int maximo = UIUtils.scale(150);
+    private List<String> etiquetas() {
+        ArrayList<String> etiquetas = new ArrayList<String>();
         for (TasaExitoCentroDTO resultado : resultados) {
-            maximo = Math.max(maximo,
-                    metrics.stringWidth(etiqueta(resultado)) + UIUtils.scale(28));
+            etiquetas.add(etiqueta(resultado));
         }
-        return Math.min(maximo, UIUtils.scale(340));
+        return etiquetas;
     }
 
     private String etiqueta(TasaExitoCentroDTO resultado) {
@@ -118,42 +129,25 @@ class TasaExitoCentroGrafico extends JPanel implements Scrollable {
                 ? "Sin nombre" : resultado.getCentroEmpleador();
     }
 
-    private void dibujarCentro(Graphics2D g2, String nombre, int margenIzquierdo, int y) {
-        String texto = nombre == null ? "Sin nombre" : nombre;
-        FontMetrics metrics = g2.getFontMetrics();
-        int anchoMaximo = margenIzquierdo - UIUtils.scale(20);
-        while (texto.length() > 1 && metrics.stringWidth(texto) > anchoMaximo) {
-            texto = texto.substring(0, texto.length() - 1);
+    private List<String> porcentajes() {
+        ArrayList<String> porcentajes = new ArrayList<String>();
+        for (TasaExitoCentroDTO resultado : resultados) {
+            porcentajes.add(String.format("%.2f%%", resultado.getTasaConversion()));
         }
-        if (!texto.equals(nombre)) {
-            texto = texto.length() > 3 ? texto.substring(0, texto.length() - 3) + "..." : texto;
-        }
-        g2.setColor(Color.DARK_GRAY);
-        g2.drawString(texto, UIUtils.scale(12), y);
+        return porcentajes;
     }
 
-    private void dibujarBarra(Graphics2D g2, int x, int y, int anchoDisponible,
-                              int alto, int valor, int maximo, Color color) {
-        int ancho = valor == 0 ? 0
-                : Math.max(UIUtils.scale(2), Math.round(anchoDisponible * valor / (float) maximo));
-        g2.setColor(color);
-        g2.fillRoundRect(x, y, ancho, alto, UIUtils.scale(4), UIUtils.scale(4));
-        g2.setColor(Color.DARK_GRAY);
-        g2.drawString(String.valueOf(valor), x + ancho + UIUtils.scale(6),
-                y + alto - UIUtils.scale(2));
-    }
-
-    private void dibujarTasa(Graphics2D g2, double tasaExito, int x, int y) {
-        g2.setColor(UIUtils.TEAL_DARK);
+    private void dibujarTasa(Graphics2D g2, String tasaConversion, int finColumna, int y) {
         g2.setFont(UIUtils.defaultFont(Font.BOLD));
-        g2.drawString(String.format("%.2f%%", tasaExito), x, y);
+        GraficoBarrasUtils.dibujarTextoDerecha(
+                g2, tasaConversion, finColumna, y, UIUtils.TEAL_DARK);
         g2.setFont(UIUtils.defaultFont(Font.PLAIN));
     }
 
     private int valorMaximo() {
         int maximo = 1;
         for (TasaExitoCentroDTO resultado : resultados) {
-            maximo = Math.max(maximo, resultado.getSolicitudesRecibidas());
+            maximo = Math.max(maximo, resultado.getOportunidadesEnviadas());
             maximo = Math.max(maximo, resultado.getContrataciones());
         }
         return maximo;
