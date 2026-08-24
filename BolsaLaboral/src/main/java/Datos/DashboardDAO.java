@@ -4,6 +4,8 @@ import logico.BrechaOfertaDemandaDTO;
 import logico.Candidato;
 import logico.ManoObraMunicipioDTO;
 import logico.OfertaLaboral;
+import logico.Solicitud;
+import logico.TasaExitoCentroDTO;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -59,6 +61,21 @@ public class DashboardDAO {
                     "LEFT JOIN vacantes_por_municipio vp ON vp.id_municipio = m.id_municipio " +
                     "ORDER BY candidatos_desempleados DESC";
 
+    private static final String SELECT_TASA_EXITO_POR_CENTRO =
+            "SELECT ce.nombre AS centro, " +
+                    "COUNT(s.id_solicitud) AS solicitudes_recibidas, " +
+                    "SUM(CASE WHEN s.estado = ? THEN 1 ELSE 0 END) AS contrataciones, " +
+                    "ROUND(" +
+                    "CAST(SUM(CASE WHEN s.estado = ? THEN 1 ELSE 0 END) AS FLOAT) " +
+                    "/ NULLIF(COUNT(s.id_solicitud), 0) * 100, 2" +
+                    ") AS tasa_exito " +
+                    "FROM centrosEmpleadores ce " +
+                    "JOIN ofertas o ON o.id_centroEmpleador = ce.id_centroEmpleador " +
+                    "JOIN solicitudes s ON s.id_oferta = o.id_oferta " +
+                    "GROUP BY ce.nombre " +
+                    "HAVING COUNT(s.id_solicitud) > 0 " +
+                    "ORDER BY tasa_exito DESC";
+
     public ArrayList<BrechaOfertaDemandaDTO> consultarBrechaPorAreaLaboral() {
         ArrayList<BrechaOfertaDemandaDTO> resultados =
                 new ArrayList<BrechaOfertaDemandaDTO>();
@@ -107,6 +124,33 @@ public class DashboardDAO {
         } catch (SQLException exception) {
             throw new RuntimeException(
                     "No se pudo consultar la mano de obra desempleada por municipio.",
+                    exception);
+        }
+
+        return resultados;
+    }
+
+    public ArrayList<TasaExitoCentroDTO> consultarTasaExitoPorCentro() {
+        ArrayList<TasaExitoCentroDTO> resultados = new ArrayList<TasaExitoCentroDTO>();
+
+        try (Connection connection = Conexion.obtenerConexion();
+             PreparedStatement statement =
+                     connection.prepareStatement(SELECT_TASA_EXITO_POR_CENTRO)) {
+            statement.setString(1, Solicitud.ESTADO_APROBADA);
+            statement.setString(2, Solicitud.ESTADO_APROBADA);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    resultados.add(new TasaExitoCentroDTO(
+                            resultSet.getString("centro"),
+                            resultSet.getInt("solicitudes_recibidas"),
+                            resultSet.getInt("contrataciones"),
+                            resultSet.getDouble("tasa_exito")));
+                }
+            }
+        } catch (SQLException exception) {
+            throw new RuntimeException(
+                    "No se pudo consultar la tasa de éxito de contratación por centro empleador.",
                     exception);
         }
 

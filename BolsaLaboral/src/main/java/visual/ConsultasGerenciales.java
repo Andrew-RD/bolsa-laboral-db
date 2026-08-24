@@ -6,6 +6,7 @@ import logico.BolsaLaboral;
 import logico.BrechaOfertaDemandaDTO;
 import logico.ManoObraMunicipioDTO;
 import logico.Permiso;
+import logico.TasaExitoCentroDTO;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -26,12 +27,14 @@ public class ConsultasGerenciales extends JDialog {
 
     private static final String TARJETA_BRECHA = "brecha-oferta-demanda";
     private static final String TARJETA_MANO_OBRA = "mano-obra-municipio";
+    private static final String TARJETA_TASA_EXITO = "tasa-exito-centro";
 
     private final DashboardDAO dashboardDAO = new DashboardDAO();
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel tarjetas = new JPanel(cardLayout);
     private BrechaOfertaDemandaDialog dialogoResultadosBrecha;
     private ManoObraMunicipioDialog dialogoResultadosManoObra;
+    private TasaExitoCentroDialog dialogoResultadosTasaExito;
 
     public ConsultasGerenciales() {
         AutorizacionService.exigirPermiso(
@@ -48,6 +51,7 @@ public class ConsultasGerenciales extends JDialog {
         tarjetas.setBackground(UIUtils.SURFACE);
         tarjetas.add(crearConsultaBrecha(), TARJETA_BRECHA);
         tarjetas.add(crearConsultaManoObra(), TARJETA_MANO_OBRA);
+        tarjetas.add(crearConsultaTasaExito(), TARJETA_TASA_EXITO);
         content.add(tarjetas, BorderLayout.CENTER);
 
         JButton cerrar = UIUtils.button("Cerrar", "cerrar.png");
@@ -103,6 +107,16 @@ public class ConsultasGerenciales extends JDialog {
         manoObra.setForeground(Color.WHITE);
         manoObra.addActionListener(event -> cardLayout.show(tarjetas, TARJETA_MANO_OBRA));
         menu.add(manoObra);
+        menu.add(Box.createVerticalStrut(UIUtils.scale(8)));
+
+        JButton tasaExito = UIUtils.button("Tasa de éxito por centro", "informes.png");
+        tasaExito.setAlignmentX(LEFT_ALIGNMENT);
+        tasaExito.setHorizontalAlignment(JButton.LEFT);
+        tasaExito.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIUtils.scale(44)));
+        tasaExito.setBackground(UIUtils.TEAL);
+        tasaExito.setForeground(Color.WHITE);
+        tasaExito.addActionListener(event -> cardLayout.show(tarjetas, TARJETA_TASA_EXITO));
+        menu.add(tasaExito);
         menu.add(Box.createVerticalGlue());
         return menu;
     }
@@ -177,6 +191,40 @@ public class ConsultasGerenciales extends JDialog {
         return panel;
     }
 
+    private JPanel crearConsultaTasaExito() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(UIUtils.SURFACE);
+        panel.setBorder(UIUtils.emptyBorder(34, 40, 34, 40));
+
+        JLabel titulo = new JLabel("Tasa de éxito de contratación por centro empleador");
+        titulo.setFont(UIUtils.h2Font(Font.BOLD));
+        titulo.setForeground(UIUtils.TEAL_DARK);
+        titulo.setAlignmentX(LEFT_ALIGNMENT);
+        panel.add(titulo);
+        panel.add(Box.createVerticalStrut(UIUtils.scale(18)));
+
+        panel.add(crearTexto("Compara, por centro empleador, las solicitudes recibidas " +
+                "con las que resultaron en una contratación aprobada."));
+        panel.add(Box.createVerticalStrut(UIUtils.scale(12)));
+        panel.add(crearEtiqueta("Decisión que apoya"));
+        panel.add(Box.createVerticalStrut(UIUtils.scale(4)));
+        panel.add(crearTexto("Permite identificar qué centros empleadores convierten mejor sus " +
+                "solicitudes en contrataciones, para dar seguimiento a los de bajo desempeño." ));
+        panel.add(Box.createVerticalStrut(UIUtils.scale(18)));
+        panel.add(crearEtiqueta("Cómo interpretar el resultado"));
+        panel.add(Box.createVerticalStrut(UIUtils.scale(4)));
+        panel.add(crearTexto("La tasa de éxito es el porcentaje de solicitudes recibidas que " +
+                "terminaron en una contratación aprobada"));
+        panel.add(Box.createVerticalGlue());
+
+        JButton verResultados = UIUtils.button("Ver resultados", "consulta.png");
+        verResultados.setAlignmentX(LEFT_ALIGNMENT);
+        verResultados.addActionListener(event -> verResultadosTasaExito());
+        panel.add(verResultados);
+        return panel;
+    }
+
     private JLabel crearEtiqueta(String texto) {
         JLabel etiqueta = new JLabel(texto);
         etiqueta.setFont(UIUtils.largeFont(Font.BOLD));
@@ -237,6 +285,33 @@ public class ConsultasGerenciales extends JDialog {
             }
             dialogoResultadosManoObra = new ManoObraMunicipioDialog(this, resultados);
             dialogoResultadosManoObra.setVisible(true);
+        } catch (RuntimeException exception) {
+            JOptionPane.showMessageDialog(this, exception.getMessage(),
+                    "No se pudo ejecutar la consulta", JOptionPane.ERROR_MESSAGE);
+        } finally {
+            setCursor(anterior);
+        }
+    }
+
+    private void verResultadosTasaExito() {
+        if (dialogoResultadosTasaExito != null && dialogoResultadosTasaExito.isVisible()) {
+            dialogoResultadosTasaExito.toFront();
+            return;
+        }
+
+        Cursor anterior = getCursor();
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        try {
+            List<TasaExitoCentroDTO> resultados =
+                    dashboardDAO.consultarTasaExitoPorCentro();
+            if (resultados.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "No existen centros empleadores con solicitudes para mostrar.",
+                        "Consultas gerenciales", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            dialogoResultadosTasaExito = new TasaExitoCentroDialog(this, resultados);
+            dialogoResultadosTasaExito.setVisible(true);
         } catch (RuntimeException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(),
                     "No se pudo ejecutar la consulta", JOptionPane.ERROR_MESSAGE);
